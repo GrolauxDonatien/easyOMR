@@ -253,7 +253,12 @@ const utils = (() => {
     }
 
     function imageThreshold(image, clear = false) {
-        return image.threshold(clear ? 160 : 200, 255, cv.THRESH_BINARY_INV).bgrToGray(); // switching to gray after the threshold greatly enhances the precision when using a blue marker
+        let tmp=image.threshold(clear ? 160 : 200, 255, cv.THRESH_BINARY_INV);
+        try {
+            return tmp.bgrToGray(); // switching to gray after the threshold greatly enhances the precision when using a blue marker
+        } catch (_) {
+            return tmp; // already gray
+        }
     }
 
     function findContoursExceptBorder(image) {
