@@ -1,8 +1,8 @@
 const electron = require('electron');
 const { app, BrowserWindow } = electron;
 const fs=require("fs");
-const DEBUG = true;
-const VERSION = "1.0.25";
+const DEBUG = false;
+const VERSION = "1.0.26";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) { // eslint-disable-line global-require
