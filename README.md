@@ -9,5 +9,7 @@ easyOMR replaces this process by offering a streamlined UI for the quick and eas
 
 However, easyOMR is not limited to working with Moodle. You can also use it alone to quickly create response forms, process the scans from the students' answers, and export the results to Excel. The generated Excel sheet provides an auto-grading solution where you set the points for each questions, and the points are calculated automatically for each student. Alternatively, you also have the opportunity to create your own form using Word, mixing questions and answers, and easyOMR can then process it as usual.
 
+![easyOMR workflows](https://github.com/GrolauxDonatien/easyOMR/blob/main/workflow.png?raw=true)
+
 easyOMR is an Electron application, using opencv for OMR.
 
