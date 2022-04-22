@@ -1,0 +1,301 @@
+body {
+    display: flex;
+    margin: 0px 0px 0px 0px;
+    flex-direction: column;
+    height: 100%;
+    user-select: none;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    overflow: hidden;
+}
+
+pre {
+    display: inline;
+}
+
+.main {
+    padding: 5px 5px 5px 5px;
+}
+
+.panel {
+    display: none;
+    flex-grow: 1;
+    flex-direction: column;
+    max-height: -webkit-fill-available;
+    overflow: auto;
+    margin-bottom: 31px;
+}
+
+.panel.selected {
+    display: flex;
+}
+
+#project .main {
+    text-align: center;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+#project .main button {
+    padding: 20px;
+}
+
+#steps {
+    width: 100%;
+    align-self: flex-end;
+    margin: 0px 0px 0px 0px;
+    background-color: dimgray;
+    height: 24px;
+    padding-top: 7px;
+    position: fixed;
+    bottom: 0px;
+}
+
+#steps a {
+    padding: 5px 20px 5px 30px;
+    background-color: lightgray;
+    border-right: none;
+    border-top: solid 1px lightslategray;
+    border-bottom: solid 1px lightslategray;
+    cursor: pointer;
+    margin-left: -4px;
+}
+
+#steps span {
+    position: absolute;
+    margin-top: 1px;
+    margin-left: 12px;
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-bottom: 15px solid lightslategrey;
+    transform: rotate(90deg);
+}
+
+#steps .selected {
+    background-color: darkcyan !important;
+}
+
+#steps .disabled {
+    background-color: dimgray !important;
+    color: darkgray;
+    cursor: inherit;
+}
+
+#steps .selected span {
+    border-bottom: 15px solid darkcyan !important;
+}
+
+.panel.selected {
+    display: flex;
+}
+
+.hint {
+    background-color: lightyellow;
+    margin: 2px 2px 2px 2px;
+    border: dashed 1px gray;
+    border-radius: 8px;
+    padding: 5px 5px 5px 5px;
+}
+
+.hint::after {
+    content: "\2716";
+    position: absolute;
+    right: 3px;
+    top: 3px;
+    cursor: pointer;
+    background-color: lightgray;
+    padding: 1px 1px 1px 1px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+
+.hint.collapsed {
+    position: absolute;
+    width: 4px;
+    height: 10px;
+    left: 0px;
+    color: transparent;
+    font-size: 0px;
+}
+
+.hint.collapsed+div {
+    margin-left:24px;
+}
+
+.hint.collapsed::after {
+    content: "?";
+    color: black;
+    font-size: 11px;
+    position: absolute;
+    right: 3px;
+    top: 3px;
+    cursor: pointer;
+    background-color: lightgray;
+    padding: 1px 1px 1px 1px;
+    border-top-right-radius: 0px;
+    border-bottom-left-radius: 0px;
+}
+
+.hint.collapsed * {
+    display: none;
+}
+
+
+.scanview {
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+    overflow: auto;
+}
+
+.scanview .rightview {
+    flex-grow: 1;
+    display: flex;
+    border-left: solid 1px black;
+    overflow: auto;
+}
+
+.leftview .selected {
+    background-color: cornflowerblue;
+}
+
+.leftview ul {
+    list-style-type: none;
+    padding: 0px 5px 0px 5px;
+    margin-top: 0px;
+    white-space: nowrap;
+    margin-bottom: 0px;
+    overflow-y: hidden;
+}
+
+.leftview {
+    background-color: aliceblue;
+    overflow: auto;
+    min-width: fit-content;
+}
+
+.lock {
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    background-color: rgba(0, 0, 0, 0.2);
+    text-align: center;
+    font-size: xx-large;
+    display: grid;
+}
+
+.lock>div {
+    background-color: rgba(255, 255, 255, 0.75);
+    margin-top: auto;
+    margin-bottom: auto;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 20px;
+}
+
+.lock .title {
+    position: relative;
+    top:-16px;
+    border-bottom: solid 2px lightgray;
+    border-bottom: solid 2px lightgray;
+    font-family: sans-serif;
+    font-size: 30px;
+}
+
+.lock .content {
+    text-align: left;
+    font-family: sans-serif;
+    font-size: 16px;
+    white-space: pre;
+}
+
+.lock .buttonbar {
+    text-align: right;
+    position: relative;
+    top: 10px;
+    border-top: solid 2px lightgray;
+    padding-top: 8px;
+}
+
+.lock .buttonbar button {
+    margin-left: 10px;
+}
+
+.scanbuttons, .templatebuttons {
+    position: fixed;
+    right: 12px;
+    margin-top: 5px;
+    margin-right: 5px;
+    background-color: gainsboro;
+    padding: 5px 5px 5px 5px;
+    border-radius: 8px;
+}
+
+.scanbuttons span {
+    font-size: 17px;
+    font-weight: bold;
+}
+
+.scanbuttons button, .templatebuttons button {
+    background-color: white;
+    border-radius: 5px;
+}
+
+.scanbuttons select {
+    background-color: white;
+    border-radius: 5px;
+    border-width: 2px;
+}
+
+.filters {
+    background-color: aliceblue;
+    padding: 5px 5px 5px 5px;
+    border-top: solid 1px lightgray;
+    border-bottom: solid 1px black;
+    margin-top: 5px;
+}
+
+.copyleft {
+    position: absolute;
+    bottom: 40px;
+    right: 10px;
+}
+
+.hasErrors {
+    color: red;
+    padding: 5px 5px 5px 5px;
+    font-weight: bold;
+}
+
+#export .exports button {
+    display: block;
+    margin-left: 20px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+#edit-template .editor {
+    overflow: auto;
+}
+
+#edit-template .editor table {
+    border-collapse: collapse;
+}
+
+#edit-template .editor table td {
+    border: solid 1px lightgray;
+}
+
+#edit-template .editor table td:first-child+td {
+    width: 200px;
+}
+
+.positionview {
+    flex-grow: 1;
+    display: flex;
+    overflow: auto;
+}

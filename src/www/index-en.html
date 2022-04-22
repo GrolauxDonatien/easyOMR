@@ -1,0 +1,241 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="panel" id="project">
+        <div class="hint">Each project is defined by a folder on disk. This folder is organized with these sub-folders:
+            suivants :
+            <ul>
+                <li>
+                    <pre>template</pre> : drop template files here. Template files are the clean forms.
+                </li>
+                <li>
+                    <pre>scans</pre> : drop scan files here, one page per file.
+                </li>
+                <li>
+                    <pre>export</pre> : once scan files have been processed, export functions create files here.
+                </li>
+            </ul>
+            <p>The sub-folders are create automatically is needed. Supported file types are jpg and pdf.</p>
+        </div>
+        <div class="main">
+            <button id="openProject">Open a project...</button>
+            <span class="copyleft">2022, Donatien Grolaux, ICHEC</span>
+        </div>
+        <div id="projectInfo"></div>
+    </div>
+    <div class="panel" id="template">
+        <div class="hint">A template defines where the boxes are in the forms. easyOMR supports three types of templates:<br>
+            1. Response grids created by the Quizz Offline tool of Moodle. To use this kind of template, place the pdf file containing the response grid created by Moodle into the template folder.<br>
+            2. Response grids managed directly by easyOMR. They are similar to the previous type, but do not rely on Moodle for creation as they are directly managed by this tool. <br>
+            3. A mixed document where both the questions and the checkboxes for the answers are present.<br>
+            <br>
+            For the first type, drop the pdf file created by Moodle into the template directory of this project.<br>
+            For the second and third types, click on the <pre>Edit...</pre> button to create to select the template type and start using it.<br>
+            This button only appears when the template directory is empty, and also for the second type of templates.<br>
+        </div>
+        <div><label for="templateDirectory">Template directory: </label><button id="templateDirectory"></button>
+            <button id="template-edit-button" style="float:right">Edit...</button>
+        </div>
+        <div class="scanview" id="templateView">
+        </div>
+    </div>
+    <div class="panel" id="edit-template">
+        <div class="hint">
+            Editing this template consists in giving, for each group, the number of responses as well as the number of possible choices for each response.<br>
+            By saving this template, a new PDF file is created in the template directory.<br>
+            The <pre>Copy</pre> button creates new lines, while the <pre>Delete</pre> button removes them.
+        </div>
+        <div style="position:relative">
+            <div class="templatebuttons">
+                <label for="grouplist"></label><select id="grouplist"></select>&nbsp;
+                <button class="save" title="CTRL+S to save">Save</button>
+                <button class="cancel" title="Esc to cancel">Cancel</button>
+            </div>
+        </div>
+        <div class="editor"></div>
+    </div>
+    <div class="panel" id="edit-custom-template">
+        <div class="hint">
+            Editing this template consists in changing the grouping of the checkboxes that belong to the same question.<br>
+            Click on the checkboxes to select/deselect them, and on the <pre>Group</pre> button to regroup them into a single response<br>.
+            When a group is formed, orphan checkboxes are automatically reorganized into their own groups.<br>
+            Groups are automatically numbered, from top to bottom, and from left to right for checkboxes on the same line.<br>
+        </div>
+        <div style="position:relative">
+            <div class="templatebuttons">
+                <button class="group" title="CTRL+G to group">Group</button>
+                <button class="save" title="CTRL+S to save">Save</button>
+                <button class="cancel" title="Esc to cancel">Cancel</button>
+            </div>
+        </div>
+        <div class="positionview"></div>
+    </div>
+    <div class="panel" id="scans">
+        <div class="hint">Scan the responses, one jpg file per page, and put them in this folder.<br>
+            You can also use PDF files containing several response pages.<br>
+            CTRL+mouse wheel to zoom the picture. CTRL+S to save modifications and select the next scan that needs to be corrected.
+        </div>
+        <div><label for="scansDirectory">Scan directory: </label><button id="scansDirectory"></button>
+            <span id="startscans">
+                Scans are missing: <button>Click here to proceed...</button>
+            </span>
+        </div>
+        <div class="filters">Display filters:
+            <input id="ok" type="checkbox"><label for="ok">Everything OK (<span>0</span> &check;)</label>
+            <input id="noma" type="checkbox" checked><label for="noma">ID number problem (<span>0</span> ?)</label>
+            <input id="pending" type="checkbox" checked><label for="pending">Inaccurate reading (<span>0</span>
+                &#x1F50E;&#xFE0E;)</label>
+            <input id="pages" type="checkbox" checked><label for="pages">Incomplete pages (<span>0</span>
+                &#x1F4D6;)</label>
+            <div class="scanbuttons">
+                <button class="position" title="Repositionner">&#9714;</button>
+                &nbsp;&nbsp;&nbsp;
+                <select></select>
+                &nbsp;&nbsp;&nbsp;
+                <button class="bg" title="Tick all blue boxes"><span style='color:blue'>&#9744;</span>
+                    &#8594; <span style='color:green'>&#9746;</span></button>
+                <button class="bo" title="Untick all blue boxes"><span style='color:blue'>&#9744;</span>
+                    &#8594; <span style='color:black'>&#9744;</span></button>
+                <button class="ro" style="display:none"><span style='color:red'>&#9744;</span> &#8594; <span
+                        style='color:black'>&#9744;</span></button>
+                &nbsp;&nbsp;&nbsp;
+                <button class="save"
+                    title="S to save or CTRL+S to save and select the next first scan in the list.">Save</button>
+                <button class="cancel" title="Esc to cancel">Cancel</button>
+            </div>
+        </div>
+        <div class="scanview" id="scansView">
+        </div>
+    </div>
+    <div class="panel" id="position">
+        <div class="hint">
+            Here you can manually reposition the scan.
+        </div>
+        <div style="position:relative">
+            <div class="templatebuttons">
+                <button class="save" title="CTRL+S to save">Save</button>
+                <button class="cancel" title="Esc to cancel">Cancel</button>
+            </div>
+        </div>
+        <div class="positionview"></div>
+    </div>
+    <div class="panel" id="export">
+        <div class="hint">Results can be exported in several ways.<br>
+            Exported files are all saved in the export sub-directory of your project.<br>
+            &bullet; <pre>Export scans for Moodle Import</pre> (for Moodle templates only) creates "clean" scan files that you can import in Moodle. Moodle should be able to scan these files with zero issue.<br>
+            &bullet; <pre>Export template to Moodle XML format</pre> creates a generic XML file that can be imported into a question bank of Moodle. Beware that this file does not contain the questions nor the evaluation information, you have to add them in Moodle afterwards.<br>
+            &bullet; Other export options create files containing the raw responses. Excel exports also contain an auto-generated correction structure where points should be given to each response met for each question, and each student is graded accordingly.<br>
+        </div>
+        <div><label for="exportDirectory">Export directory: </label><button id="exportDirectory"></button></div>
+        <div class="exports">
+            <hr>
+            <button id="exportMoodle">Export scans for Moodle import, jpg format</button>
+            <button id="exportMoodleZip">Export scans for Moodle import, zip format</button>
+            <button id="exportMoodleXML">Export template to Moodle XML format</button>
+            <hr>
+            <button id="exportCSVComma">Export CSV (using , as separator)</button>
+            <button id="exportCSV">Export CSV (using ; as separator)</button>
+            <button id="exportExcel">Export Excel</button>
+            <button id="exportExcelImages">Export Excel with names in images</button>
+            <hr>
+            <div class="hasErrors">
+                Warning: there remains scanning errors. It is possible to export the current results, but the data will be incomplete.
+            </div>
+        </div>
+    </div>
+    <div id="steps">
+        <a data-id="project">Project<span></span></a>
+        <a data-id="template">Template<span></span></a>
+        <a data-id="edit-template" style="display:none;">Edit Template<span></span></a>
+        <a data-id="edit-custom-template" style="display:none;">Edition Template<span></span></a>
+        <a data-id="scans">Scans<span></span></a>
+        <a data-id="position" style="display:none;">Reposition<span></span></a>
+        <a data-id="export">Exports<span></span></a>
+    </div>
+    <script>
+        const fileScanStrings = {
+            A4Error: "Incorrect image format",
+            groupError: "Unable to accurately read the group",
+            templateError: "No template for this group : "
+        }
+
+        const exportStrings = {
+            name: "Name",
+            noma: "ID Number",
+            group: "Group",
+            points:"Points",
+            scanFiles: "Scan Files",
+            scans:"Scans",
+            corrections:"Corrections",
+            pointsInstruction:"For each question and each response, provide the value for this combination in the Points column.",
+            createZip:"Creating zip file(s)...",
+            running:"Exporting...",
+        }
+
+        const customTemplateStrings = {
+            answerform: "Response Form",
+            forautoanalysis: "For automatic analysis",
+            firstname: "First Name",
+            lastname: "Last Name",
+            invigilator: "Invigilator",
+            signature: "Signature",
+            group: "Group",
+            "instruction1": `This form will be scanned automatically. Do not fold or stain, and use a black or blue pen\nto fill the fields :`,
+            "instruction2": `Only boxes ticked clearly are interpreted correctly ! To correct a ticked box, completely\nfill it: it will be interpreted as an unticked box :`,
+            idnumber: "ID Number",
+            "instruction3": `The boxes thus corrected cannot be ticked anymore.\nDo not write anything outside of the boxes.`,
+            editTemplate: "Template Edit",
+            editTemplatePickAChoice: `What type of template do you want:
+1) Use a response grid create by the Offline Quizz tool of Moodle?
+2) Use a response grid managed by this tool, similar to type 1 but independent from Moodle?
+3) Use a document mixing questions and responses?`,
+            editTemplateChoice1: "1) Moodle Grid",
+            editTemplateChoice2: "2) easyOMR Grid",
+            editTemplateChoice3: "3) Mixed document",
+            editTemplateMoodleTitle: "Moodle response grid template",
+            editTemplateMoodle: `To use easyOMR with a response grid created by the Offline Quizz tool of Moodle,
+you just need to place the response grid pdf file created by Moodle into the template directory of this project.`,
+            editTemplateCustomTitle: "Mixed questions/answers document",
+            editTemplateCustom: `The mixed document is created out of a Word document that you need to edit yourself.
+If you continue, un basic Word document will be created inside this project template folder.
+Edit this document as needed, while respecting the constraints of formatting therein described.
+easyOMR cannot directly work with Word document, but it can work with pdf files:
+In Word, select File/Save As/Double-Click This Computer/Change Type to PDF (*.pdf), and
+save into the template directory of this project, replacing the pdf file present there.`
+        }
+
+        const errorStrings = {
+            nomaTemplate: "INVALID TEMPLATE: unreadable ID number !",
+            groupTemplate: "INVALID TEMPLATE: unreadable group !",
+            retryTemplate: "Scan this template again and retry.",
+            questionsTemplate: "INVALID TEMPLATE: unreadable questions !",
+            scan1: "Scan this page again, a replace the file to try again.",
+            scan2: "You can also manually assign a group/page number.",
+            missingImage: "Missing image file.",
+            deleteZip: "There was an error while deleting existing zip files.",
+            deleteImages: "There was an error while deleting existing jpg files.",
+            createZip: "There was an error while creating zip files."
+        }
+
+        const strings = {
+            updatingTemplates: "Updating templates",
+            group: "Group",
+            page: "Page",
+            updatingScans: "Updating scans",
+            addGroup: "Add a group",
+            delete:"Delete",
+            copy:"Copy",
+            continue: "Continue",
+            cancel: "Cancel"
+        }
+    </script>
+    <script src="api.js"></script>
+    <script src="utils.js"></script>
+    <script src="front.js"></script>
+</body>
+
+</html>

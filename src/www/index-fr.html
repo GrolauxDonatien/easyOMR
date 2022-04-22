@@ -1,0 +1,273 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="panel" id="project">
+        <div class="hint">Chaque projet est défini par un répertoire. Ce répertoire contiendra les sous-répertoires
+            suivants :
+            <ul>
+                <li>
+                    <pre>template</pre> : placez-y un document de réponse complètement vide.
+                </li>
+                <li>
+                    <pre>scans</pre> : placez-y les scans bruts, au format jpg. Une page égale un fichier.
+                </li>
+                <li>
+                    <pre>export</pre> : une fois les scans traités, les options d'export créeront des fichiers ici.
+                </li>
+            </ul>
+            <p>Ces répertoires seront créés automatiquement si nécessaire. Les formats de fichier supportés sont jpg et pdf.</p>
+        </div>
+        <div class="main">
+            <button id="openProject">Ouvrir un projet...</button>
+            <span class="copyleft">2022, Donatien Grolaux, ICHEC</span>
+        </div>
+        <div id="projectInfo"></div>
+    </div>
+    <div class="panel" id="template">
+        <div class="hint">Un template définit quelles sont les cases à scanner dans les réponses. easyOMR supporte trois
+            types de templates:<br>
+            1. Les grilles de réponses des Quizz Offline de Moodle. Pour l'utiliser, déposez le fichier PDF généré par
+            Moodle directement dans le répertoire de template de ce projet.<br>
+            2. Des grilles de réponses gérées directement par easyOMR. Elles sont similaires mais indépendantes de
+            celles de Moodle. <br>
+            3. Un document mixte mélangeant les questions et les cases à cocher pour les réponses. <br>
+            <br>
+            Pour le type 1, téléchargez la grille de réponse au format PDF de Moodle, et déposez là dans le répertoire
+            template de ce projet.<br>
+            Pour les deux autres types, un bouton
+            <pre>Edition...</pre> apparaît ci-dessous quand le répertoire de template de ce projet est vide. Ce bouton
+            ouvre une boite de dialogue permettant de choisir le type souhaité.<br>
+        </div>
+        <div><label for="templateDirectory">Répertoire de template: </label><button id="templateDirectory"></button>
+            <button id="template-edit-button" style="float:right">Edition...</button>
+        </div>
+        <div class="scanview" id="templateView">
+        </div>
+    </div>
+    <div class="panel" id="edit-template">
+        <div class="hint">
+            L'édition du template consiste à donner, pour chaque groupe, le nombre de réponses ainsi que le nombre de
+            choix pour chaque réponse.<br>
+            En sauvant ce template, vous générerez une nouvelle grille de réponses dans le répertoire template de votre
+            projet.<br>
+            Le bouton
+            <pre>Copier</pre> permet de créer de nouvelles lignes, tandis que le bouton
+            <pre>Effacer</pre> les supprime.
+        </div>
+        <div style="position:relative">
+            <div class="templatebuttons">
+                <label for="grouplist"></label><select id="grouplist"></select>&nbsp;
+                <button class="save" title="CTRL+S pour sauver">Sauver</button>
+                <button class="cancel" title="Esc pour annuler">Annuler</button>
+            </div>
+        </div>
+        <div class="editor"></div>
+    </div>
+    <div class="panel" id="edit-custom-template">
+        <div class="hint">
+            L'édition du template consiste à changer les groups qui forment une réponse.<br>
+            Cliquez sur les cases à cocher pour les sélectionner/désélectionner et sur le bouton
+            <pre>Grouper</pre> pour former un groupe.<br>
+            Lors de la formation d'un groupe, les cases orphelines sont aussi automatiquement réorganisées en
+            groupe.<br>
+            Les groupes sont automatiquement numérotés de haut en bas, et de gauche à droite quand ils sont sur la même
+            ligne.<br>
+        </div>
+        <div style="position:relative">
+            <div class="templatebuttons">
+                <button class="group" title="CTRL+G pour grouper">Grouper</button>
+                <button class="save" title="CTRL+S pour sauver">Sauver</button>
+                <button class="cancel" title="Esc pour annuler">Annuler</button>
+            </div>
+        </div>
+        <div class="positionview"></div>
+    </div>
+    <div class="panel" id="scans">
+        <div class="hint">Les réponses doivent être scannées, un fichier jpg par page page scannée, et placés dans le
+            répertoire ci-dessous.<br>
+            Vous pouvez aussi utiliser une fichier PDF contenant plusieurs scans, un par page.<br>
+            CTRL+molette sur l'image permet de la zoomer. CTRL+S sauve la modification en cours et sélectionne le
+            prochain scan à corriger.
+        </div>
+        <div><label for="scansDirectory">Répertoire des scans: </label><button id="scansDirectory"></button>
+            <span id="startscans">
+                Des scans manquent : <button>Cliquez ici pour démarrer...</button>
+            </span>
+        </div>
+        <div class="filters">Filtres d'affichage:
+            <input id="ok" type="checkbox"><label for="ok">Tout OK (<span>0</span> &check;)</label>
+            <input id="noma" type="checkbox" checked><label for="noma">Problème matricule (<span>0</span> ?)</label>
+            <input id="pending" type="checkbox" checked><label for="pending">Imprécis (<span>0</span>
+                &#x1F50E;&#xFE0E;)</label>
+            <input id="pages" type="checkbox" checked><label for="pages">Problème de page (<span>0</span>
+                &#x1F4D6;)</label>
+            <div class="scanbuttons">
+                <button class="position" title="Repositionner">&#9714;</button>
+                &nbsp;&nbsp;&nbsp;
+                <select></select>
+                &nbsp;&nbsp;&nbsp;
+                <button class="bg" title="Cocher toutes les cases bleues"><span style='color:blue'>&#9744;</span>
+                    &#8594; <span style='color:green'>&#9746;</span></button>
+                <button class="bo" title="Décocher toutes les cases bleues"><span style='color:blue'>&#9744;</span>
+                    &#8594; <span style='color:black'>&#9744;</span></button>
+                <button class="ro" style="display:none"><span style='color:red'>&#9744;</span> &#8594; <span
+                        style='color:black'>&#9744;</span></button>
+                &nbsp;&nbsp;&nbsp;
+                <button class="save"
+                    title="S pour sauver, CTRL+S pour sauver et sélectionner le prochain en tête de liste.">Sauver</button>
+                <button class="cancel" title="Esc pour annuler">Annuler</button>
+            </div>
+        </div>
+        <div class="scanview" id="scansView">
+        </div>
+    </div>
+    <div class="panel" id="position">
+        <div class="hint">
+            Cette interface sert à repositionner manuellement le scan.
+        </div>
+        <div style="position:relative">
+            <div class="templatebuttons">
+                <button class="save" title="CTRL+S pour sauver">Sauver</button>
+                <button class="cancel" title="Esc pour annuler">Annuler</button>
+            </div>
+        </div>
+        <div class="positionview"></div>
+    </div>
+    <div class="panel" id="export">
+        <div class="hint">Vous pouvez exporter les résultats de plusieurs façons.<br>
+            Les fichiers exportés sont tous créés dans le sous-répertoire export de votre projet.<br>
+            &bullet; L'
+            <pre>export images pour import Moodle</pre> (uniquement disponible pour les templates de type Moodle) génère
+            des images "propres" que vous pouvez ensuite importer
+            dans Moodle et qui ne devraient pas lui poser de problème de scanning.<br>
+            &bullet; L'
+            <pre>export du template au format Moodle XML</pre> génère un fichier générique de questions que vous
+            pouvez
+            importer dans une banque de question Moodle. Attention, ce fichier ne contient évidemment pas l'intitulé de
+            la question ni l'information
+            de correction, vous devrez la configurer dans Moodle vous-même.<br>
+            &bullet; Les autres exports génèrent des fichiers contenant les résultats bruts. Les exports Excel
+            contiennent aussi une structure de correction auto-générée :
+            il faut assigner des points pour chaque question à chaque réponse rencontrée dans les scans. Le système
+            génère alors une correction sommative pour chaque étudiant automatiquement.
+        </div>
+        <div><label for="exportDirectory">Répertoire d'export: </label><button id="exportDirectory"></button></div>
+        <div class="exports">
+            <hr>
+            <button id="exportMoodle">Export Images pour import Moodle, au format jpg</button>
+            <button id="exportMoodleZip">Export Images pour import Moodle, au format zip</button>
+            <button id="exportMoodleXML">Export du template au format Moodle XML</button>
+            <hr>
+            <button id="exportCSVComma">Export CSV (avec , comme séparateur)</button>
+            <button id="exportCSV">Export CSV (avec ; comme séparateur)</button>
+            <button id="exportExcel">Export Excel</button>
+            <button id="exportExcelImages">Export Excel avec les noms en image</button>
+            <hr>
+            <div class="hasErrors">
+                Attention: il reste des erreurs à corriger. L'export reste possible, mais les données exportées
+                seront incomplètes.
+            </div>
+        </div>
+    </div>
+    <div id="steps">
+        <a data-id="project">Project<span></span></a>
+        <a data-id="template">Template<span></span></a>
+        <a data-id="edit-template" style="display:none;">Edition Template<span></span></a>
+        <a data-id="edit-custom-template" style="display:none;">Edition Template<span></span></a>
+        <a data-id="scans">Scan<span></span></a>
+        <a data-id="position" style="display:none;">Position<span></span></a>
+        <a data-id="export">Export<span></span></a>
+    </div>
+    <script>
+        const fileScanStrings = {
+            A4Error: "Mauvais format d'image",
+            groupError: "Lecture imprécise du groupe",
+            templateError: "Pas de template pour ce groupe : "
+        }
+
+        const exportStrings = {
+            name: "Nom",
+            noma: "Matricule",
+            group: "Group",
+            points: "Points",
+            scanFiles: "Fichiers",
+            scans: "Scans",
+            corrections: "Corrections",
+            pointsInstruction: "Pour chaque question et chaque réponse, entrez dans la colonne Points la valeur de cette réponse pour cette question.",
+            createZip:"Création du/des zip...",
+            running:"Export en cours...",
+
+        }
+
+        const customTemplateStrings = {
+            answerform: "Grille de réponses",
+            forautoanalysis: "Pour analyse automatique",
+            firstname: "Prénom",
+            lastname: "Nom",
+            invigilator: "Surveillant(e)",
+            signature: "Signature",
+            group: "Groupe",
+            "instruction1": `Cette grille de réponses sera scannée automatiquement. Veuillez ne pas plier ou tâcher.
+Utilisez un stylo noir ou bleu pour remplir les champs :`,
+            "instruction2": `Seules les cases cochées clairement sont interprétées correctement ! Pour corriger une case
+cochée, remplissez complètement la case de couleur : elle sera interprétée comme non
+cochée :`,
+            idnumber: "Matricule",
+            "instruction3": `Les cases ainsi corrigées ne peuvent pas être marquées à nouveau. Veuillez ne rien inscrire
+en dehors des cases`,
+            editTemplate: "Edition de template",
+            editTemplatePickAChoice: `Que souhaitez-vous faire :
+1) Corriger des grilles de réponses provenant de Moodle ?
+2) Générer une grille de réponses, similaire mais indépendante de Moodle ?
+3) Créer un document mixant les questions et les cases de réponses ?`,
+            editTemplateChoice1: "1) Grille Moodle",
+            editTemplateChoice2: "2) Grille easyOMR",
+            editTemplateChoice3: "3) Document Mixte",
+            editTemplateMoodleTitle: "Utilisation sur une grille Moodle",
+            editTemplateMoodle: `Pour utiliser easyOMR avec une grille de réponse de Moodle,
+il suffit de placer le PDF de la grille de réponse dans le répertoire de template de votre projet.`,
+            editTemplateCustomTitle: "Utilisation avec un document mixte questions/réponses",
+            editTemplateCustom: `La création d'un template mixant des questions et réponses se fait sur base d'un document Word.
+Si vous continuez, un document de base sera créé dans le répertoire template de votre projet.
+Editez-le comme souhaité, en respectant les contraintes de format décrites.
+easyOMR ne peut pas travailler directement avec Word, mais pourra travailler avec un fichier PDF:
+Dans Word, Sélectionnez Fichier/Enregistrer sous/Double-cliquez Ce PC/Changez Type à PDF (*.pdf) et
+sauvez dans le répertoire de template de ce projet, en remplaçant le fichier pdf qui y est présent.`
+        }
+
+        const errorStrings = {
+            nomaTemplate: "TEMPLATE INVALIDE: matricule illisible !",
+            groupTemplate: "TEMPLATE INVALIDE: groupe illisible !",
+            retryTemplate: "Re-scannez ce template et remplacez ce fichier.",
+            questionsTemplate: "TEMPLATE INVALIDE: questions illisibles !",
+            scan1: "Re-scannez cette page et remplacez ce fichier pour réessayer.",
+            scan2: "Vous pouvez aussi tenter d'assigner un groupe/numéro de page explicitement.",
+            missingImage: "Image manquante.",
+            mixedTemplates: "Attention : vos templates mélangent des types différents et ne pourront fonctionner correctement ensembles.",
+            deleteZip: "Problème lors de l'effacement préalable des fichiers zip.",
+            deleteImages: "Problème lors de l'effacement préalable des images.",
+            createZip: "Problème lors de la création du zip."
+        }
+
+        const strings = {
+            updatingTemplates: "Mise à jour des templates",
+            group: "Groupe",
+            page: "Page",
+            updatingScans: "Mise à jour des scans",
+            addGroup: "Ajouter un groupe",
+            delete: "Effacer",
+            copy: "Copier",
+            continue: "Continuer",
+            cancel: "Annuler"
+        }
+    </script>
+    <script src="api.js"></script>
+    <script src="utils.js"></script>
+    <script src="front.js"></script>
+</body>
+
+</html>
