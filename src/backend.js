@@ -682,6 +682,11 @@ let actions = {
         } else { // enforces .jpg export
             exportpath = exportpath.substring(0, exportpath.length - fspath.extname(exportpath).length) + ".jpg";
         }
+
+        try {
+            tplimage=tplimage.bgrToGray(); // if scans are in color, put back in gray
+        } catch (_) {}
+        
         cv.imwrite(exportpath, tplimage, [cv.IMWRITE_JPEG_QUALITY, 25]);
         return true;
     },
