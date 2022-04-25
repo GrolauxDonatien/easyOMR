@@ -592,6 +592,14 @@ let actions = {
     "clear-scan": async function ({ path, scan, template }) {
         let scanimage = await readFile(fspath.join(path, "scans", formatFilename(scan.filename)));
         let tplimage = await readFile(fspath.join(path, "template", formatFilename(template.filename)));
+        // bring both to grayscale
+        try {
+            scanimage=scanimage.bgrToGray();
+        } catch (_) {};
+        try {
+            tplimage=tplimage.bgrToGray();
+        } catch (_) {};
+
         let exportpath = fspath.join(path, "export", formatFilename(scan.filename));
         const Point2 = omr.utils.cv.Point2;
         const Size = omr.utils.cv.Size;
@@ -683,10 +691,10 @@ let actions = {
             exportpath = exportpath.substring(0, exportpath.length - fspath.extname(exportpath).length) + ".jpg";
         }
 
-        try {
+/*        try {
             tplimage=tplimage.bgrToGray(); // if scans are in color, put back in gray
-        } catch (_) {}
-        
+        } catch (_) {}*/
+
         cv.imwrite(exportpath, tplimage, [cv.IMWRITE_JPEG_QUALITY, 25]);
         return true;
     },
