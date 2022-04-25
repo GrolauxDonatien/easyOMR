@@ -1,5 +1,7 @@
 # easyOMR
-Optical Mark Recognition made easy for teachers.
+Optical Mark Recognition made easy for teachers. With easyOMR, it is easy to create answer forms for OMR recognition, import and correct the scanned results from the students, and export everything to Excel for grading. easyOMR can work hand in hand with Moodle Offline Quizz module, or juste stand-alone with no Moodle required at all.
+
+![easyOMR screenshot](https://github.com/GrolauxDonatien/easyOMR/blob/main/screenshot.png?raw=true)
 
 The https://moodle.org/plugins/mod_offlinequiz module of Moodle adds paper-and-pencil multiple-choice quizzes to Moodle. This module is able to create response grids specific to custom questionnaires, and students' answer forms are evaluated and graded automatically. 
 
@@ -11,5 +13,9 @@ However, easyOMR is not limited to working with Moodle. You can also use it alon
 
 ![easyOMR workflows](https://github.com/GrolauxDonatien/easyOMR/blob/main/workflow.png?raw=true)
 
-easyOMR is an Electron application, using opencv for OMR.
+easyOMR is an Electron application, using opencv for OMR. It is currently translated in english and french. To run in french, add --lang=fr as a command line option.
+You are welcome to contribute other languages. Let XX be the 2 character ISO standard for the your new language:
+- copy www/index-en.html to www/index-XX.html and translate every strings in the file, including HTML and JavaScript.
+- copy resources/template-en.docx to resources/template-XX.docx. Once the file is translated, print it to PDF to create resources/template-XX.pdf.
+
 
