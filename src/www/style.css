@@ -299,3 +299,12 @@ pre {
     display: flex;
     overflow: auto;
 }
+
+.boxed {
+    border: solid 1px black;
+    color: lightgray;
+    display: inline-block;
+    height: 20px;
+    width: 12px;
+    text-align: center;
+}

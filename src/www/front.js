@@ -1532,9 +1532,9 @@ const project = (() => {
         function getBoxes(n) {
             let l = [];
             for (let j = 0; j < n; j++) {
-                l.push("&#9744;");
+                l.push('<span class="boxed">'+String.fromCharCode(j+97)+"</span>&nbsp;");
             }
-            return "<small>(" + n + ")</small> " + l.join("");
+            return  l.join("");
         }
 
         function select(group) {
