@@ -531,7 +531,7 @@ const project = (() => {
 
         rebind(document.querySelector(".scanbuttons select"), "focusin", changeTemplateLong);
         document.querySelector(".scanbuttons select").addEventListener("change", changeTemplate);
-        document.querySelector(".scanbuttons select").addEventListener("focusout", changeTemplateShort);
+        document.querySelector(".scanbuttons select").addEventListener("focusout", changeTemplate);
 
         rebind(document.querySelector(".scanbuttons .position"), "click", position);
 
@@ -776,6 +776,7 @@ const project = (() => {
 
         function changeTemplate() {
             changeTemplateShort();
+            if (currentScan==null) return;
             let path = joinPath(joinPath(current.path, "scans"), currentScan.filename);
             let tgt = document.querySelector(".scanbuttons select").value;
             let gcount = {};
@@ -784,6 +785,8 @@ const project = (() => {
                 if (!(tpl.thisgroup in gcount)) gcount[tpl.thisgroup] = 0;
                 gcount[tpl.thisgroup]++;
                 if (tpl.thisgroup + gcount[tpl.thisgroup] == tgt) {
+                    // nothing really changed
+                    if (currentScan.group==tpl.thisgroup && currentScan.template==tpl.filename) continue;
                     api('file-scan-fixed', { path, template: tpl, strings: fileScanStrings, corners: currentScan.corners }, (result) => {
                         delete currentScan.error; // reset eventual error
                         for (let k in result) {
