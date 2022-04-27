@@ -13,9 +13,7 @@ However, easyOMR is not limited to working with Moodle. You can also use it alon
 
 ![easyOMR workflows](https://github.com/GrolauxDonatien/easyOMR/blob/main/workflow.png?raw=true)
 
-easyOMR is an Electron application, using opencv for OMR. It is currently translated in english and french. To run in french, add --lang=fr as a command line option.
-You are welcome to contribute other languages. Let XX be the 2 character ISO standard for the your new language:
+easyOMR is an Electron application, using opencv for OMR. It is currently translated into English and French. To run in French, add `--lang=fr` to the command line.
+You are welcome to contribute other languages. Let XX be the 2 character ISO standard for the new language:
 - copy www/index-en.html to www/index-XX.html and translate every strings in the file, including HTML and JavaScript.
 - copy resources/template-en.docx to resources/template-XX.docx. Once the file is translated, print it to PDF to create resources/template-XX.pdf.
-
-
