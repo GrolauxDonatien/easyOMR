@@ -5,39 +5,39 @@ const path = require('path');
 const fs = require("fs");
 const child_process = require('child_process');
 
-let packages=JSON.parse(fs.readFileSync("package.json"));
-let versions=packages.version.split(".");
-let last=parseInt(versions[versions.length-1]);
+let packages = JSON.parse(fs.readFileSync("package.json"));
+let versions = packages.version.split(".");
+let last = parseInt(versions[versions.length - 1]);
 versions.pop();
-versions.push(last+1);
-versions=versions.join(".");
-packages.version=versions;
-fs.writeFileSync("package.json",JSON.stringify(packages,null,4));
+versions.push(last + 1);
+versions = versions.join(".");
+packages.version = versions;
+fs.writeFileSync("package.json", JSON.stringify(packages, null, 4));
 
 // turn off debug
 
-function setConstant(fn,constant,value) {
-    let source=fs.readFileSync(fn,"utf-8");
-    let idx=source.indexOf(constant);
-    if (idx!=-1) {
-        idx+=constant.length;
-        while(idx<source.length && (source[idx]==" " || source[idx]=="\n")) idx++;
-        if (source[idx]=="=") {
+function setConstant(fn, constant, value) {
+    let source = fs.readFileSync(fn, "utf-8");
+    let idx = source.indexOf(constant);
+    if (idx != -1) {
+        idx += constant.length;
+        while (idx < source.length && (source[idx] == " " || source[idx] == "\n")) idx++;
+        if (source[idx] == "=") {
             idx++;
-            while(idx<source.length && (source[idx]==" " || source[idx]=="\n")) idx++;
-            let start=idx;
-            while(idx<source.length && (source[idx]!=";" && source[idx]!="\n")) idx++;
-            source=source.substring(0,start)+value+source.substring(idx);
-            fs.writeFileSync(fn,source);
+            while (idx < source.length && (source[idx] == " " || source[idx] == "\n")) idx++;
+            let start = idx;
+            while (idx < source.length && (source[idx] != ";" && source[idx] != "\n")) idx++;
+            source = source.substring(0, start) + value + source.substring(idx);
+            fs.writeFileSync(fn, source);
         }
     }
 }
 
-setConstant('src/main.js',"DEBUG","false");
-setConstant('src/omr.js',"DEBUG","false");
-setConstant('src/main.js',"VERSION",'"'+versions+'"');
+setConstant('src/main.js', "DEBUG", "false");
+setConstant('src/omr.js', "DEBUG", "false");
+setConstant('src/main.js', "VERSION", '"' + versions + '"');
 
-console.log("Creatin version "+versions);
+console.log("Creatin version " + versions);
 
 const APP_NAME = "easyOMR"
 const APP_DIR = path.resolve(__dirname, './' + APP_NAME + '-win32-x64');
@@ -95,6 +95,13 @@ if (BUILDMSI) {
     msiCreator.create().then(function () {
         // Step 5: Compile the template to a .msi file
         msiCreator.compile().then(function () {
+            // Step 6: rename the .msi to include the version number.
+            let files = fs.readdirSync(OUT_DIR);
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].endsWith(".msi")) {
+                    fs.renameSync(path.join(OUT_DIR, files[i]), path.join(OUT_DIR, files[i].substring(0, files[i].length - 4) + "-" + versions + ".msi"));
+                }
+            }
             console.log("MSI is ready");
         });
     });

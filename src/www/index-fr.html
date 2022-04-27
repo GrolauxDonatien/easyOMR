@@ -174,7 +174,7 @@
         </div>
     </div>
     <div id="steps">
-        <a data-id="project">Project<span></span></a>
+        <a data-id="project">Projet<span></span></a>
         <a data-id="template">Template<span></span></a>
         <a data-id="edit-template" style="display:none;">Edition Template<span></span></a>
         <a data-id="edit-custom-template" style="display:none;">Edition Template<span></span></a>
@@ -183,6 +183,13 @@
         <a data-id="export">Export<span></span></a>
     </div>
     <script>
+        localStorage.setItem("easyOMR-lang","fr");
+        const menuStrings= {
+            "File":"Fichier",
+            "Language":"Langue",
+            "About...":"A propos...",
+            "Exit":"Exit"
+        }
         const fileScanStrings = {
             A4Error: "Mauvais format d'image",
             groupError: "Lecture imprécise du groupe",

@@ -15,7 +15,7 @@ const IMAGETYPES = ["bmp", "pbm", "pgm", "ppm", "sr", "ras", "jpeg", "jpg", "jpe
 const AsyncFunction = (async () => { }).constructor;
 const ZIPCUTSIZE = 30 * 1024 * 1024; // when exporting clear scans for Moodle, zip files are cut after 25 MB is reached
 
-let mainWindow;
+let getWindow, setMenu, menuTemplate;
 
 let watches = {};
 
@@ -75,7 +75,7 @@ async function getTemplatePageId(projectpath, template, res) {
 
 let actions = {
     "project-open"(_) {
-        let fn = dialog.showOpenDialogSync(mainWindow, {
+        let fn = dialog.showOpenDialogSync(getWindow(), {
             properties: ['openDirectory']
         });
         return (fn === undefined ? null : fn[0]);
@@ -594,11 +594,11 @@ let actions = {
         let tplimage = await readFile(fspath.join(path, "template", formatFilename(template.filename)));
         // bring both to grayscale
         try {
-            scanimage=scanimage.bgrToGray();
-        } catch (_) {};
+            scanimage = scanimage.bgrToGray();
+        } catch (_) { };
         try {
-            tplimage=tplimage.bgrToGray();
-        } catch (_) {};
+            tplimage = tplimage.bgrToGray();
+        } catch (_) { };
 
         let exportpath = fspath.join(path, "export", formatFilename(scan.filename));
         const Point2 = omr.utils.cv.Point2;
@@ -691,9 +691,9 @@ let actions = {
             exportpath = exportpath.substring(0, exportpath.length - fspath.extname(exportpath).length) + ".jpg";
         }
 
-/*        try {
-            tplimage=tplimage.bgrToGray(); // if scans are in color, put back in gray
-        } catch (_) {}*/
+        /*        try {
+                    tplimage=tplimage.bgrToGray(); // if scans are in color, put back in gray
+                } catch (_) {}*/
 
         cv.imwrite(exportpath, tplimage, [cv.IMWRITE_JPEG_QUALITY, 25]);
         return true;
@@ -791,6 +791,12 @@ let actions = {
             }
         }
         return true;
+    }, "set-menu": async function (newMenu) {
+        menuTemplate.label=newMenu.File;
+        menuTemplate.submenu[0].label=newMenu.Language;
+        menuTemplate.submenu[2].label=newMenu["About..."];
+        menuTemplate.submenu[3].label=newMenu.Exit;
+        setMenu(menuTemplate);
     }
 }
 function formatFilename(fn) {
@@ -855,8 +861,10 @@ function flattenExport({ indexes, lines, strings, users }) {
 }
 
 module.exports = {
-    init({ mainWindow: mw }) {
-        mainWindow = mw;
+    init({ getWindow: gw, menuTemplate: mt, setMenu:sm }) {
+        getWindow = gw;
+        menuTemplate = mt;
+        setMenu = sm;
         electron.ipcMain.on('ajax-message', async (event, arg) => {
             try {
                 if (arg.action in actions) {

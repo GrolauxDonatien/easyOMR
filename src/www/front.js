@@ -9,6 +9,7 @@
 *
 */
 
+api("set-menu",menuStrings);
 
 function joinPath(path, extra) {
     let sep = (path.indexOf('/') != -1) ? "/" : "\\";

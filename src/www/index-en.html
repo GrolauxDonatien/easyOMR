@@ -157,6 +157,14 @@
         <a data-id="export">Exports<span></span></a>
     </div>
     <script>
+        localStorage.setItem("easyOMR-lang","en");
+        const menuStrings= {
+            "File":"File",
+            "Language":"Language",
+            "About...":"About...",
+            "Exit":"Exit"
+        }
+
         const fileScanStrings = {
             A4Error: "Incorrect image format",
             groupError: "Unable to accurately read the group",
