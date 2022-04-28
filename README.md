@@ -1,4 +1,6 @@
 # easyOMR
+Please see the ![Wiki](https://github.com/GrolauxDonatien/easyOMR/wiki) to access the user manual.
+
 Optical Mark Recognition made easy for teachers. With easyOMR, it is easy to create answer forms for OMR recognition, import and correct the scanned results from the students, and export everything to Excel for grading. easyOMR can work hand in hand with Moodle Offline Quizz module, or just stand-alone with no Moodle required at all.
 
 ![easyOMR screenshot](https://github.com/GrolauxDonatien/easyOMR/blob/main/screenshot.png?raw=true)
