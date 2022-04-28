@@ -1,0 +1,16 @@
+<html>
+
+<body>
+    ...
+    <script>
+        debugger;
+        let l = localStorage.getItem("easyOMR-lang");
+        if (l == null) {
+            location.replace("index-en.html");
+        } else {
+            location.replace("index-" + l + ".html");
+        }
+    </script>
+</body>
+
+</html>
