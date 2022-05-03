@@ -524,6 +524,8 @@ const viewer = (() => {
                     let tgt = root.querySelectorAll("li")[idx];
                     tgt.classList.add("selected");
                     nav.bringIntoView(tgt);
+                } else if (Number.isInteger(n) && n>=0 && n<elements.length) {
+                    select(elements[n]);
                 }
             }
         }

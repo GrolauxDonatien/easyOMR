@@ -9,14 +9,14 @@
 *
 */
 
-api("set-menu",menuStrings);
+api("set-menu", menuStrings);
 
 function joinPath(path, extra) {
     let sep = (path.indexOf('/') != -1) ? "/" : "\\";
     return path + sep + extra;
 }
 
-let customTemplateEditor;
+let customTemplateEditor, redrawTemplate, redrawScan;
 const PAD = 5;
 
 function formatFilename(fn) {
@@ -169,6 +169,11 @@ const project = (() => {
                     } else {
                         if (v.select() != null) {
                             select(v.select());
+                        } else {
+                            v.select(0); // force select first item
+                            if (v.select() != null) {
+                                select(v.select());
+                            }
                         }
                         setNav();
                     }
@@ -498,7 +503,9 @@ const project = (() => {
                 current.template = [];
                 v.setList([]);
                 update(files);
-            }, customTemplateEditor
+            }, customTemplateEditor, redraw() {
+                v.redraw();
+            }
         }
     }
 
@@ -776,7 +783,7 @@ const project = (() => {
 
         function changeTemplate() {
             changeTemplateShort();
-            if (currentScan==null) return;
+            if (currentScan == null) return;
             let path = joinPath(joinPath(current.path, "scans"), currentScan.filename);
             let tgt = document.querySelector(".scanbuttons select").value;
             let gcount = {};
@@ -786,7 +793,7 @@ const project = (() => {
                 gcount[tpl.thisgroup]++;
                 if (tpl.thisgroup + gcount[tpl.thisgroup] == tgt) {
                     // nothing really changed
-                    if (currentScan.group==tpl.thisgroup && currentScan.template==tpl.filename) continue;
+                    if (currentScan.group == tpl.thisgroup && currentScan.template == tpl.filename) continue;
                     api('file-scan-fixed', { path, template: tpl, strings: fileScanStrings, corners: currentScan.corners }, (result) => {
                         delete currentScan.error; // reset eventual error
                         for (let k in result) {
@@ -1168,6 +1175,12 @@ const project = (() => {
             let f = filters();
             list = toList(s, f, currentScan);
             v.setList(Object.keys(list));
+            if (v.select()==null) {
+                v.select(0); // force select first item
+                if (v.select() != null) {
+                    select(v.select());
+                }
+            }
         }
 
         api.push("directory-watch", path, update);
@@ -1241,6 +1254,9 @@ const project = (() => {
                     v.clear();
                     update(files);
                 }
+            },
+            redraw() {
+                return v.redraw();
             }
         }
     }
@@ -1338,9 +1354,11 @@ const project = (() => {
                 document.getElementById("scansDirectory").innerHTML = "&#128193; " + toText(current.path + sep + "scans");
                 document.getElementById("exportDirectory").innerHTML = "&#128193; " + toText(current.path + sep + "export");
                 let scan = runScansView();
+                redrawScan = scan.redraw;
                 let tplView = runTemplateView(scan.reset);
                 forceRefresh = tplView.forceRefresh;
                 customTemplateEditor = tplView.customTemplateEditor;
+                redrawTemplate = tplView.redraw;
             }
         }, (e) => {
             alert(e.responseText);
@@ -1536,9 +1554,9 @@ const project = (() => {
         function getBoxes(n) {
             let l = [];
             for (let j = 0; j < n; j++) {
-                l.push('<span class="boxed">'+String.fromCharCode(j+97)+"</span>&nbsp;");
+                l.push('<span class="boxed">' + String.fromCharCode(j + 97) + "</span>&nbsp;");
             }
-            return  l.join("");
+            return l.join("");
         }
 
         function select(group) {
@@ -1777,6 +1795,7 @@ nav.addSelectEvent((panel) => {
             }
             break;
         case "template":
+            if (redrawTemplate) redrawTemplate();
             if (templates.length == 0) {
                 document.getElementById("template-edit-button").style.display = "inline-block";
             } else {
@@ -1795,6 +1814,9 @@ nav.addSelectEvent((panel) => {
             break;
         case "edit-template":
             project.runTemplateEditor(document.querySelector("#edit-template .editor"));
+            break;
+        case "scans":
+            if (redrawScan) redrawScan();
             break;
     }
 });
@@ -1880,7 +1902,7 @@ document.getElementById("template-edit-button").addEventListener('click', () => 
                         }
                     });
                 },
-                Annuler() {
+                [strings.cancel]: function () {
                     diag.destroy();
                 }
             }
