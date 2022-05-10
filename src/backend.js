@@ -754,9 +754,10 @@ let actions = {
         // clear cache just in case
         pageidcache = {};
         // delete all template files in path
-        let config = [];
         path = fspath.join(path, "template"); // template directory in project
+        let bytes={};
         for (let k in groups) {
+            let config = [];
             let group = groups[k];
             for (let p = 0; p < group.length; p += 48) {
                 let tpl = {
@@ -765,15 +766,15 @@ let actions = {
                 }
                 for (let i = 0; i < 48 && i + p < group.length; i++) {
                     let q = [];
-                    for (let j = 0; j < group[i]; j++) {
+                    for (let j = 0; j < group[i+p]; j++) {
                         q.push({});
                     }
                     tpl.questions.push(q);
                 }
                 config.push(tpl);
             }
+            bytes["template"+k+".pdf"]=await omr.pdf.templateToPDF(config, strings);
         }
-        let bytes = await omr.pdf.templateToPDF(config, strings);
         // delete jpg and pdf from template directory
         let files = fs.readdirSync(path, { withFileTypes: true });
         for (let i = 0; i < files.length; i++) {
@@ -782,7 +783,9 @@ let actions = {
                 fs.rmSync(fspath.join(path, files[i].name));
             }
         }
-        fs.writeFileSync(fspath.join(path, 'template.pdf'), bytes);
+        for(let f in bytes) {
+            fs.writeFileSync(fspath.join(path, f), bytes[f]);
+        }
         return true;
     },
     "template-custom-copy": async function ({ path, lang }) {

@@ -1632,7 +1632,7 @@ const project = (() => {
         function save() {
             api('template-create', { path: current.path, groups, strings: customTemplateStrings }, () => {
                 nav.select("template");
-                forceRefresh();
+//                forceRefresh();
             }, (e) => { alert(e.message); });
         }
 
