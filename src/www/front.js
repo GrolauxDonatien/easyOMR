@@ -1534,7 +1534,7 @@ const project = (() => {
             if (v == "new") {
                 for (let i = 0; i < groupLetter.length; i++) {
                     if (!(groupLetter[i] in groups)) {
-                        groups[groupLetter[i]] = [];
+                        groups[groupLetter[i]] = [2];
                         let option = document.createElement("OPTION");
                         option.setAttribute("value", groupLetter[i]);
                         option.innerText = strings.group + " " + groupLetter[i];

@@ -150,7 +150,12 @@ let actions = {
         let denoised = omr.utils.imageDenoised(image);
         let edged = omr.utils.imageThreshold(denoised, true);
         ret.corners = omr.utils.findCornerPositions(edged);
-        if ((ret.corners.br.x - ret.corners.tl.x) * (ret.corners.br.y - ret.corners.tl.y) / (ret.width * ret.height) < 0.5) {
+        if ((ret.corners.br.x - ret.corners.tl.x) * (ret.corners.br.y - ret.corners.tl.y) / (ret.width * ret.height) < 0.5
+            || (Math.abs(ret.corners.tl.x - ret.corners.bl.x) / ret.width > 0.01)
+            || (Math.abs(ret.corners.tr.x - ret.corners.br.x) / ret.width > 0.01)
+            || (Math.abs(ret.corners.tl.y - ret.corners.tr.y) / ret.width > 0.01)
+            || (Math.abs(ret.corners.bl.y - ret.corners.br.y) / ret.width > 0.01)
+        ) {
             // corners seem wacky, try again with more sensitivity
             edged = omr.utils.imageThreshold(denoised, false);
             ret.corners = omr.utils.findCornerPositions(edged);
@@ -792,10 +797,10 @@ let actions = {
         }
         return true;
     }, "set-menu": async function (newMenu) {
-        menuTemplate.label=newMenu.File;
-        menuTemplate.submenu[0].label=newMenu.Language;
-        menuTemplate.submenu[2].label=newMenu["About..."];
-        menuTemplate.submenu[3].label=newMenu.Exit;
+        menuTemplate.label = newMenu.File;
+        menuTemplate.submenu[0].label = newMenu.Language;
+        menuTemplate.submenu[2].label = newMenu["About..."];
+        menuTemplate.submenu[3].label = newMenu.Exit;
         setMenu(menuTemplate);
     }
 }
@@ -861,7 +866,7 @@ function flattenExport({ indexes, lines, strings, users }) {
 }
 
 module.exports = {
-    init({ getWindow: gw, menuTemplate: mt, setMenu:sm }) {
+    init({ getWindow: gw, menuTemplate: mt, setMenu: sm }) {
         getWindow = gw;
         menuTemplate = mt;
         setMenu = sm;
