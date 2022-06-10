@@ -298,6 +298,11 @@ let actions = {
             dy = righttemplate.group[0][0].y - group.y;
         }
 
+        if (dy<-2) dy=-2;
+        if (dy>2) dy=2;
+        if (dx<-2) dx=-2;
+        if (dx>2) dx=2;
+
         ret.answers = answers[best].answers;
         ret.noma = omr.checker.getNoma(warped, righttemplate.noma, -dx, -dy);
         ret.group = group.group;
@@ -348,6 +353,10 @@ let actions = {
         let righttemplate = template;
         dx = righttemplate.group[0][0].x - group.x;
         dy = righttemplate.group[0][0].y - group.y;
+        if (dy<-2) dy=-2;
+        if (dy>2) dy=2;
+        if (dx<-2) dx=-2;
+        if (dx>2) dx=2;
         // shift warped dx and dy
 
         let result = omr.checker.getResult(warped, righttemplate, -dx, -dy);
@@ -366,6 +375,7 @@ let actions = {
         let image = await readFile(path);
         let cropped = omr.utils.cropNormalizedCorners(corners, image);
         ret.image = cv.imencode(".jpg", cropped).toString("base64");
+        ret.path=path;
         return ret;
     },
     "file-original": async function ({ path, corners }) {

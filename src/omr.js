@@ -180,20 +180,22 @@ const utils = (() => {
     }
 
     function cropNormalizedCorners(corners, image) {
+        let width = Math.floor(REFSIZE / 1.4142);
+        let height = REFSIZE;
         let src = [
             new Point2(corners.tl.x, corners.tl.y),
             new Point2(corners.tr.x, corners.tr.y),
             new Point2(corners.br.x, corners.br.y),
             new Point2(corners.bl.x, corners.bl.y)
         ]
-        let width = Math.floor(REFSIZE / 1.4142);
-        let height = REFSIZE;
         let dst = [
             new Point2(0, 0),
             new Point2(width - 1, 0),
             new Point2(width - 1, height - 1),
             new Point2(0, height - 1)];
-
+        if (corners.pivot===true) {
+            image=image.rotate(cv.ROTATE_180);
+        }
         let matrix = cv.getPerspectiveTransform(src, dst);
         return image.warpPerspective(matrix, new Size(width, height));
     }
@@ -204,14 +206,14 @@ const utils = (() => {
     }
 
     function cropCornersMatrix(corners, image) {
+        let width = image.sizes[1];
+        let height = image.sizes[0];
         let src = [
             new Point2(corners.tl.x, corners.tl.y),
             new Point2(corners.tr.x, corners.tr.y),
             new Point2(corners.br.x, corners.br.y),
             new Point2(corners.bl.x, corners.bl.y)
         ]
-        let width = image.sizes[1];
-        let height = image.sizes[0];
         let dst = [
             new Point2(0, 0),
             new Point2(width - 1, 0),
@@ -253,7 +255,7 @@ const utils = (() => {
     }
 
     function imageThreshold(image, clear = false) {
-        let tmp=image.threshold(clear ? 160 : 200, 255, cv.THRESH_BINARY_INV);
+        let tmp = image.threshold(clear ? 160 : 200, 255, cv.THRESH_BINARY_INV);
         try {
             return tmp.bgrToGray(); // switching to gray after the threshold greatly enhances the precision when using a blue marker
         } catch (_) {
@@ -411,7 +413,7 @@ const templater = (() => {
         const area_min = BOX_MIN * BOX_MIN;
         for (let i = 0; i < cnts.length; i++) {
             let r = cnts[i].boundingRect();
-            
+
             if (r.width * r.height < area_min) continue; // elements should be roughly 30x30
             let adder;
             if (nucolumns == 2) {

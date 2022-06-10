@@ -593,6 +593,7 @@ const project = (() => {
                 }
             }
             api("file-image", { path: joinPath(path, info.filename), corners: info.corners }, (result) => {
+                if (result.path != joinPath(path, info.filename)) return;
                 let image = new Image();
                 image.onload = () => {
                     currentImage = image;
@@ -841,7 +842,15 @@ const project = (() => {
                 let ar = Math.min(wr, hr) * zoom;
                 canvas.width = ar * drawImage.width;
                 canvas.height = ar * drawImage.height;
-                context.drawImage(drawImage, 0, 0, ar * drawImage.width, ar * drawImage.height);
+                if (corners.pivot) {
+                    context.save();
+                    context.translate(canvas.width / 2, canvas.height / 2);
+                    context.rotate(Math.PI);
+                    context.drawImage(drawImage, -canvas.width / 2, -canvas.height / 2, ar * drawImage.width, ar * drawImage.height);
+                    context.restore();
+                } else {
+                    context.drawImage(drawImage, 0, 0, ar * drawImage.width, ar * drawImage.height);
+                }
                 canvas.style.width = (drawImage.width * ar) + "px";
                 canvas.style.height = (drawImage.height * ar) + "px";
                 context.fillStyle = "blue";
@@ -923,10 +932,11 @@ const project = (() => {
 
             window.addEventListener("resize", resize);
 
-            rebind(document.querySelector("#position .save"), "click", () => {
+            function savePosition() {
                 for (let i = 0; i < current.template.length; i++) {
                     if (current.template[i].filename == currentScan.template) {
                         api('file-scan-fixed', { path: joinPath(path, currentScan.filename), template: current.template[i], strings: fileScanStrings, corners: corners }, (result) => {
+                            if (currentScan == null) currentScan = {};
                             delete currentScan.error; // reset eventual error
                             for (let k in result) {
                                 currentScan[k] = result[k];
@@ -941,6 +951,7 @@ const project = (() => {
                 }
                 // if we are here, then there is no current template for this scan
                 api('file-scan', { path: joinPath(path, currentScan.filename), strings: fileScanStrings, template: current.template, corners: corners }, (result) => {
+                    if (currentScan == null) currentScan = {};
                     delete currentScan.error; // reset eventual error
                     for (let k in result) {
                         currentScan[k] = result[k];
@@ -960,9 +971,23 @@ const project = (() => {
                     nav.select("scans");
                     return;
                 });
-            })
+            }
+
+            rebind(document.querySelector("#position .save"), "click", savePosition);
             rebind(document.querySelector("#position .cancel"), "click", () => {
                 nav.select("scans");
+            })
+            rebind(document.querySelector("#position .pivot"), "click", () => {
+                corners.pivot = !(corners.pivot || false);
+                let o = {};
+                Object.assign(o, corners);
+                let w = currentScan.width;
+                let h = currentScan.height;
+                corners.tl = { x: w - o.br.x, y: h - o.br.y };
+                corners.br = { x: w - o.tl.x, y: h - o.tl.y };
+                corners.tr = { x: w - o.bl.x, y: h - o.bl.y };
+                corners.bl = { x: w - o.tr.x, y: h - o.tr.y };
+                resize();
             })
 
             resize();
@@ -1076,21 +1101,24 @@ const project = (() => {
                     if (event.ctrlKey == true) select(null); // prevent auto selection
                     update(files);
                     // find the item in the left list and select it
-                    for (let k in list) {
-                        if (list[k].filename == fn) {
-                            v.select(k);
-                            select(k);
-                            break;
-                        }
-                    }
-                    redraw();
                     if (event.ctrlKey == true) {
-                        all = [...listEl.querySelectorAll("li")];
-                        if (all.length > 0) {
-                            let event = e = document.createEvent("MouseEvents");
-                            event.initEvent("click", true, true);
-                            all[0].dispatchEvent(event, true);
+                        setTimeout(() => {
+                            all = [...listEl.querySelectorAll("li")];
+                            if (all.length > 0) {
+                                let event = e = document.createEvent("MouseEvents");
+                                event.initEvent("click", true, true);
+                                all[0].dispatchEvent(event, true);
+                            }
+                        }, 1);
+                    } else {
+                        for (let k in list) {
+                            if (list[k].filename == fn) {
+                                v.select(k);
+                                select(k);
+                                break;
+                            }
                         }
+                        redraw();
                     }
                     return;
                 }
@@ -1175,7 +1203,7 @@ const project = (() => {
             let f = filters();
             list = toList(s, f, currentScan);
             v.setList(Object.keys(list));
-            if (v.select()==null) {
+            if (v.select() == null) {
                 v.select(0); // force select first item
                 if (v.select() != null) {
                     select(v.select());
@@ -1632,7 +1660,7 @@ const project = (() => {
         function save() {
             api('template-create', { path: current.path, groups, strings: customTemplateStrings }, () => {
                 nav.select("template");
-//                forceRefresh();
+                //                forceRefresh();
             }, (e) => { alert(e.message); });
         }
 
