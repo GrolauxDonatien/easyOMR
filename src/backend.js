@@ -713,6 +713,109 @@ let actions = {
         cv.imwrite(exportpath, tplimage, [cv.IMWRITE_JPEG_QUALITY, 25]);
         return true;
     },
+    "correct-scan": async function ({ path, scan, template }) {
+        let scanimage = await readFile(fspath.join(path, "scans", formatFilename(scan.filename)));
+        let tplimage = await readFile(fspath.join(path, "template", formatFilename(template.filename)));
+        // bring both to grayscale
+        try {
+            scanimage = scanimage.bgrToGray();
+        } catch (_) { };
+        try {
+            tplimage = tplimage.bgrToGray();
+        } catch (_) { };
+
+        let exportpath = fspath.join(path, "export", formatFilename(scan.filename));
+        const Point2 = omr.utils.cv.Point2;
+        const Size = omr.utils.cv.Size;
+        let src = [
+            new Point2(scan.corners.tl.x, scan.corners.tl.y),
+            new Point2(scan.corners.tr.x, scan.corners.tr.y),
+            new Point2(scan.corners.br.x, scan.corners.br.y),
+            new Point2(scan.corners.bl.x, scan.corners.bl.y)
+        ]
+        let dst = [
+            new Point2(template.corners.tl.x, template.corners.tl.y),
+            new Point2(template.corners.tr.x, template.corners.tr.y),
+            new Point2(template.corners.br.x, template.corners.br.y),
+            new Point2(template.corners.bl.x, template.corners.bl.y)
+        ]
+        let matrix = cv.getPerspectiveTransform(src, dst);
+        // warp scan to match template
+        let warpedScan = scanimage.warpPerspective(matrix, new Size(tplimage.sizes[1], tplimage.sizes[0]));
+
+        // compute matrix from adjusted template back to original template image
+        matrix = omr.utils.cropCornersMatrix(template.corners, tplimage).inv(); // inverse matrix
+
+        // utility function to warp coordinates according to transformation matrix, returning Point2
+        function warpCoordinates(x, y, matrix) {
+            let ah = 1.4142 * tplimage.sizes[1] / omr.REFSIZE;
+            let av = tplimage.sizes[0] / omr.REFSIZE;
+            const matData = [
+                [[x * ah, y * av]]
+            ];
+            const src = new cv.Mat(matData, cv.CV_32FC2);
+            let result = src.perspectiveTransform(matrix).getDataAsArray();
+            return new Point2(result[0][0][0], result[0][0][1]);
+        }
+
+        function toPoly({ x1, y1, x2, y2 }, matrix) {
+            let p1 = warpCoordinates(x1, y1, matrix);
+            let p2 = warpCoordinates(x2, y1, matrix);
+            let p3 = warpCoordinates(x2, y2, matrix);
+            let p4 = warpCoordinates(x1, y2, matrix);
+            return [p1, p2, p3, p4];
+        }
+
+        warpedScan=warpedScan.cvtColor(cv.COLOR_GRAY2RGB);
+
+        let lineWidth = Math.floor(3 * tplimage.sizes[0] / omr.REFSIZE); // width is proportional to actual image size, for REFSIZE, width is 6
+        // tick noma boxes
+        for (let i = 0; i < scan.noma.length; i++) {
+            let s = scan.noma.charCodeAt(i) - 48;
+            let c = template.noma[i][s];
+            if (c) {
+                let p1 = warpCoordinates(c.x + 2, c.y + 2, matrix);
+                let p2 = warpCoordinates(c.x + c.w - 4, c.y + 2, matrix);
+                let p3 = warpCoordinates(c.x + c.w - 4, c.y + c.h - 4, matrix);
+                let p4 = warpCoordinates(c.x + 2, c.y + c.h - 4, matrix);
+                warpedScan.drawLine(p1, p2, omr.colors.GREEN, lineWidth);
+                warpedScan.drawLine(p2, p3, omr.colors.GREEN, lineWidth);
+                warpedScan.drawLine(p3, p4, omr.colors.GREEN, lineWidth);
+                warpedScan.drawLine(p4, p1, omr.colors.GREEN, lineWidth);
+            }
+        }
+
+        // tick answer boxes
+        for (let i = 0; i < scan.answers.length; i++) {
+            let a = scan.answers[i];
+            if (a == "99") continue;
+            a = a.split("/");
+            for (let j = 0; j < a.length; j++) {
+                let s = a[j].charCodeAt(0) - 97;
+                let c = template.questions[i][s];
+                let p1 = warpCoordinates(c.x + 2, c.y + 2, matrix);
+                let p2 = warpCoordinates(c.x + c.w - 4, c.y + 2, matrix);
+                let p3 = warpCoordinates(c.x + c.w - 4, c.y + c.h - 4, matrix);
+                let p4 = warpCoordinates(c.x + 2, c.y + c.h - 4, matrix);
+                warpedScan.drawLine(p1, p2, omr.colors.GREEN, lineWidth);
+                warpedScan.drawLine(p2, p3, omr.colors.GREEN, lineWidth);
+                warpedScan.drawLine(p3, p4, omr.colors.GREEN, lineWidth);
+                warpedScan.drawLine(p4, p1, omr.colors.GREEN, lineWidth);
+            }
+        }
+
+        let p=fspath.join(fspath.dirname(exportpath),scan.noma+".pdf");
+        if (template.page==1 && fs.existsSync(p)) {
+            try {fs.rmSync(p);} catch (_) {
+                return false;
+            }
+        }
+
+        await omr.pdf.writePDF(p, warpedScan);
+
+//        cv.imwrite(exportpath, warpedScan, [cv.IMWRITE_JPEG_QUALITY, 25]);
+        return true;
+    },
     "export-deletejpg": function ({ path }) {
         let files = fs.readdirSync(path, { withFileTypes: true });
         for (let i = 0; i < files.length; i++) {

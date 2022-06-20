@@ -1724,6 +1724,37 @@ const project = (() => {
                 api('export-excel', r, lock.destroy, lock.destroy);
             }, 100);
         },
+        exportCorrectedScans(){
+            let lock = lockDisplay(exportStrings.running);
+            let r = prepareExport("dummy");
+            let keys = Object.keys(r.lines);
+            let templates = {};
+            let gcount = {};
+            for (let i = 0; i < current.template.length; i++) {
+                let g = current.template[i].thisgroup;
+                if (!(g in gcount)) gcount[g] = 1;
+                let tpl={};
+                templates[current.template[i].filename] = tpl;
+                Object.assign(tpl, current.template[i]);
+                tpl.page=gcount[g];
+                gcount[g]++;
+            }
+
+            lock.length(keys.length);
+            // loop through setTimeouts so that the browser has a chance to refresh the display
+            function loop(i) {
+                if (!(i < keys.length)) {
+                    lock.destroy();
+                    return;
+                }
+                lock.progress(i);
+                let scan = r.lines[keys[i]];
+                api("correct-scan", { path: current.path, scan, template: templates[scan.template] },
+                    () => { setTimeout(() => { loop(i + 1) }, 1); }, // leave a bit of time for the ui to refresh for example if the window is resized
+                    () => { loop(i + 1); });
+            }
+            setTimeout(() => loop(0), 100);
+        },
         exportMoodle() {
             let lock = lockDisplay(exportStrings.running);
             let r = prepareExport("dummy");
@@ -1886,6 +1917,7 @@ document.getElementById("exportCSVComma").addEventListener('click', project.expo
 document.getElementById("exportExcel").addEventListener('click', project.exportExcel);
 document.getElementById("exportExcelImages").addEventListener('click', project.exportExcelImages);
 document.getElementById("exportExcelImages").addEventListener('click', project.exportExcelImages);
+document.getElementById("exportCorrect").addEventListener('click', project.exportCorrectedScans);
 document.getElementById("template-edit-button").addEventListener('click', () => {
     if (project.current().template.length == 0) {
         let diag = dialog({

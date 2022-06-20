@@ -2,7 +2,7 @@ const cv = require("opencv4nodejs");
 const fs = require("fs");
 const { Point2, Size } = cv;
 const { Poppler } = require("node-poppler");
-const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
+const { PDFDocument, StandardFonts, rgb, PDFImage } = require("pdf-lib");
 const REFSIZE = 2000;
 
 let DEBUG = false; // turning on will create jpg files for each box scanned
@@ -1417,10 +1417,25 @@ const pdf = (() => {
         return Buffer.from(res, "binary");
     }
 
+    async function writePDF(path, image) {
+        let pdfDoc;
+        if (fs.existsSync(path)) {
+            pdfDoc=await PDFDocument.load(fs.readFileSync(path));
+        } else {
+            pdfDoc=await PDFDocument.create();
+        }
+        const page=pdfDoc.addPage([210,297]);
+        const jpgImage=await pdfDoc.embedJpg(cv.imencode(".jpg",image,[cv.IMWRITE_JPEG_QUALITY, 25]));
+        page.drawImage(jpgImage, {x:0,y:0,width:210,height:297});
+        const pdfBytes = await pdfDoc.save();
+        fs.writeFileSync(path, pdfBytes);
+    }
+
     return {
         templateToPDF,
         getPagesCount,
-        exportPNG
+        exportPNG,
+        writePDF
     }
 })();
 
