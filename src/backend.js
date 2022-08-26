@@ -53,26 +53,6 @@ async function readFile(path) {
     return image;
 }
 
-async function getTemplatePageId(projectpath, template, res) {
-    let path = fspath.join(fspath.join(projectpath, "template"), template.filename);
-    if (path in pageidcache &&
-        JSON.stringify(template.corners) == JSON.stringify(pageidcache[path].corners) &&
-        JSON.stringify(template.pageid) == JSON.stringify(pageidcache[path].pageid)) {
-        return pageidcache[path].image;
-    } else {
-        let entry = {};
-        let image = await readFile(path);
-        let denoised = omr.utils.imageDenoised(image);
-        let edged = omr.utils.imageThreshold(denoised, true);
-        entry.corners = template.corners;
-        let warped = omr.utils.cropNormalizedCorners(entry.corners, edged);
-        entry.pageid = template.pageid;
-        entry.image = omr.utils.extractPageIdArea(warped, entry.pageid);
-        pageidcache[path] = entry;
-        return entry.image;
-    }
-}
-
 let actions = {
     "project-open"(_) {
         let fn = dialog.showOpenDialogSync(getWindow(), {
@@ -185,132 +165,12 @@ let actions = {
     },
     "file-scan": async function ({ path, template, strings, corners = null }) {
         //        console.log(path);
-        function outer(r1, r2) {
-            let x1 = Math.min(r1.x, r2.x);
-            let y1 = Math.min(r1.y, r2.y);
-            let x2 = Math.max(r1.x + r1.w, r2.x + r2.w);
-            let y2 = Math.max(r1.y + r1.h, r2.y + r2.h);
-            return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
-        }
+
         let projectpath = fspath.dirname(fspath.dirname(path));
         let image = await readFile(path);
-        let ret = {
-            width: image.sizes[1],
-            height: image.sizes[0],
-        }
-        if (!omr.utils.isImageA4(image)) {
-            ret.error = strings.A4Error;
-            ret.group = "99";
-            ret.noma = "XXXXXX";
-            return ret;
-        };
-        let denoised = omr.utils.imageDenoised(image);
-        let edged = omr.utils.imageThreshold(denoised, true);
-        if (corners == null) {
-            ret.corners = omr.utils.findCornerPositions(edged);
-        } else {
-            ret.corners = corners;
-        }
-        if ((ret.corners.br.x - ret.corners.tl.x) * (ret.corners.br.y - ret.corners.tl.y) / (ret.width * ret.height) < 0.5) {
-            // corners seem wacky, try again with more sensitivity
-            edged = omr.utils.imageThreshold(denoised, false);
-            ret.corners = omr.utils.findCornerPositions(edged);
-        }
-        let warped = omr.utils.cropNormalizedCorners(ret.corners, edged);
-        let group;
-        if (template[0].type == "custom") { // no group management for custom templates, just assume group "a"
-            group = {
-                x: AREA_GROUP.x1,
-                y: AREA_GROUP.y1,
-                group: "a"
-            }
-        } else {
-            group = omr.checker.getGroup(warped);
-        }
-        ret.pageid = omr.utils.findPageIdArea(warped, AREA_GROUP.x1 - group.x, AREA_GROUP.y1 - group.y);
-        ret.filename = fspath.basename(path);
 
-        // figure out the group coordinates of the scan:
-        // 1. so that we can read his group
-        // 2. so that we can figure out a deltas between the scan on the template, and get a more accurate reading afterwards
-
-        if (group.group == null) {
-            ret.error = strings.groupError;
-            ret.group = "99";
-            ret.noma = "XXXXXX";
-            return ret;
-        }
-        let dx = 0;
-        let dy = 0;
-
-        let scores = [];
-        let idx;
-        for (let i = 0; i < template.length; i++) {
-            idx = i;
-            if (group.group != template[i].thisgroup) continue; // wrong group
-            let pageid = omr.utils.extractPageIdArea(warped, outer(ret.pageid, template[i].pageid));
-            let thisid = await getTemplatePageId(projectpath, template[i]);
-            let score = omr.utils.pagesSimilarity(pageid, thisid);
-            scores.push({
-                score, template: template[i], pageid, thisid
-            });
-        }
-        // we just take the template with the higher similarity
-        // first we score remaining templates
-        if (scores.length == 0) {
-            ret.error = strings.templateError + group.group;
-            ret.group = "99";
-            ret.noma = "XXXXXX";
-            return ret;
-        }
-        scores.sort((a, b) => b.score.maxVal - a.score.maxVal); // sort scores, higher first
-        let answers = [];
-        // attempt getting the answers, using best scoring template first
-        let best = -1;
-        for (let j = 0; j < scores.length; j++) {
-            let righttemplate = scores[j].template;
-            if (righttemplate.type !== "custom") { // no group for custom templates => no group position shift
-                dx = righttemplate.group[0][0].x - group.x;
-                dy = righttemplate.group[0][0].y - group.y;
-            }
-            // shift warped dx and dy
-            let answer = omr.checker.getAnswers(warped, righttemplate.questions, -dx, -dy);
-            answers.push(answer);
-            if (answer.errors < answer.answers.length * 0.1) { // low level of errors, just go for it
-                best = j;
-                break;
-            }
-        }
-        if (best == -1) {
-            best = 0;
-            let max = answers[0].errors / answers[0].answers.length;
-            for (let j = 1; j < scores.length; j++) {
-                let cmax = answers[j].errors / answers[j].answers.length;
-                if (cmax < max) {
-                    best = j;
-                    max = cmax;
-                }
-            }
-        }
-        let righttemplate = scores[best].template;
-        if (righttemplate.type !== "custom") { // no group for custom templates => no group position shift
-            dx = righttemplate.group[0][0].x - group.x;
-            dy = righttemplate.group[0][0].y - group.y;
-        }
-
-        if (dy<-2) dy=-2;
-        if (dy>2) dy=2;
-        if (dx<-2) dx=-2;
-        if (dx>2) dx=2;
-
-        ret.answers = answers[best].answers;
-        ret.noma = omr.checker.getNoma(warped, righttemplate.noma, -dx, -dy);
-        ret.group = group.group;
-        ret.failed = answers[best].failed;
-        ret.errors = answers[best].errors;
-        ret.template = righttemplate.filename;
-        ret.dx = dx;
-        ret.dy = dy;
+        let {warped, group, ret}=omr.getNormalizedImage({strings, path, image,template,corners});
+        if (ret.group!="99") await omr.computeDrift({template, projectpath, warped,group,ret, pageidcache});
         return ret;
     },
     "file-scan-fixed": async function ({ path, template, strings, corners = null }) {
