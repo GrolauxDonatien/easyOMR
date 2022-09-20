@@ -1,9 +1,11 @@
+//const test=require('./test.js').init();
+
 const electron = require('electron');
 const { app, BrowserWindow, dialog } = electron;
 const fs = require("fs");
 const fspath = require("path");
-const DEBUG = true;
-const VERSION = "1.0.40";
+const DEBUG = false;
+const VERSION = "1.0.42";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) { // eslint-disable-line global-require
@@ -145,3 +147,5 @@ const engine = require('./backend.js').init({
     return mainWindow;
   }
 });
+
+

@@ -1,6 +1,6 @@
 {
     "name": "easyomr",
-    "version": "1.0.40",
+    "version": "1.0.42",
     "description": "easyOMR!",
     "main": "src/main.js",
     "author": "Donatien Grolaux",
@@ -9,6 +9,8 @@
         "rebuild": "electron-rebuild -w opencv4nodejs"
     },
     "dependencies": {
+        "@tensorflow/tfjs": "^3.20.0",
+        "@tensorflow/tfjs-node": "^3.20.0",
         "adm-zip": "^0.5.9",
         "chokidar": "^3.5.3",
         "electron": "^17.0.1",

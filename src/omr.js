@@ -1,8 +1,23 @@
 const cv = require("opencv4nodejs");
 const fs = require("fs");
+const path = require("path");
 const { Point2, Size } = cv;
 const { Poppler } = require("node-poppler");
 const { PDFDocument, StandardFonts, rgb, PDFImage } = require("pdf-lib");
+const tf = require('@tensorflow/tfjs')
+const tfn = require("@tensorflow/tfjs-node");
+
+const CREATETRAINDATA = false;
+
+let omrmodel;
+
+async function loadOMRModel() {
+    const handler = tfn.io.fileSystem("resources/model.json");
+    omrmodel = await tf.loadLayersModel(handler);
+}
+
+loadOMRModel();
+
 const REFSIZE = 2000;
 
 let DEBUG = false; // turning on will create jpg files for each box scanned
@@ -193,8 +208,8 @@ const utils = (() => {
             new Point2(width - 1, 0),
             new Point2(width - 1, height - 1),
             new Point2(0, height - 1)];
-        if (corners.pivot===true) {
-            image=image.rotate(cv.ROTATE_180);
+        if (corners.pivot === true) {
+            image = image.rotate(cv.ROTATE_180);
         }
         let matrix = cv.getPerspectiveTransform(src, dst);
         return image.warpPerspective(matrix, new Size(width, height));
@@ -608,6 +623,7 @@ const checker = (() => {
 
     function checkBox(warped) {
         if (DEBUG) cv.imwrite('box_' + (count) + ".jpg", warped);
+
         warped = warped.threshold(10, 255, cv.THRESH_BINARY); // filter out aliasing
 
         // figure out horizontal bars
@@ -772,7 +788,115 @@ const checker = (() => {
         return noma.join("");
     }
 
-    function getAnswers(image, coords, dx = 0, dy = 0) {
+    let thresholdYes1 = 1000;
+    let thresholdYes2 = -3000;
+    let thresholdNo1 = -3000;
+    let thresholdNo2 = -6000;
+
+
+    function predict(images) {
+        tf.engine().startScope();
+        let tss = [];
+        for (let i = 0; i < images.length; i++) {
+            let im = images[i];
+            tss[i] = tf.tensor(im.getData(), [im.rows, im.cols, 1]);
+        }
+        let ts = tf.stack(tss);
+        let res = omrmodel.predict(ts).dataSync();
+        tf.engine().endScope();
+        let ret = [];
+
+        for (let i = 0; i < images.length; i++) {
+            let yes1 = res[i * 2 + 1] > thresholdYes1;
+            let yes2 = res[i * 2] < thresholdYes2;
+            let no1 = res[i * 2] > thresholdNo1;
+            let no2 = res[i * 2 + 1] < thresholdNo2;
+
+            let r;
+            if (yes1 && yes2) { // surely a tick and surely not an untick
+                r = true;
+            } else if (no1 && no2) {
+                r = false;
+            } else if (yes1 || yes2) { // surely a tick or surely not an untick
+//                cv.imwrite(`maybe_${yes1}_${res[i*2+1]}_${yes2}_${res[i*2]}.jpg`,images[i]);
+                r = "maybe";
+            } else if (no1 || no2) {
+                r = false;
+            } else {
+                r = "unknown" // do not know
+            }
+            ret.push(r);
+        }
+        return ret;
+    }
+
+    function getAnswers_tensorflow(image, coords, dx = 0, dy = 0) {
+        let failed = [];
+        let answers = [];
+        let errors = 0;
+        for (let line = 0; line < coords.length; line++) {
+            let images = [];
+            let answer = [];
+            for (let col = 0; col < coords[line].length; col++) {
+                let bb = coords[line][col];
+                let ox = bb.x - 5 + dx;
+                if (ox < 0) ox = 0;
+                let oy = bb.y - 5 + dy;
+                if (oy < 0) oy = 0;
+                if (ox + 40 >= image.sizes[1]) {
+                    ox = image.sizes[1] - 41;
+                }
+                if (oy + 40 >= image.sizes[0]) {
+                    oy = image.sizes[0] - 41;
+                }
+                let rect = new cv.Rect(ox, oy, 40, 40); // take more space, gives a better chance to checkBox to find the actual box
+                let img = image.getRegion(rect).copy();
+                images.push(img);
+            }
+            let ret = predict(images);
+            for (let col = 0; col < ret.length; col++) {
+                if (ret[col] == "unknown") { // maybe it is empty empty ?
+                    if (failed[line] == undefined) failed[line] = [];
+                    let density = images[col].countNonZero() / (images[col].sizes[0] * images[col].sizes[1]);
+                    if (density < 0.01) {
+                        failed[line][col] = 'empty';
+                    } else {
+                        failed[line][col] = 'maybe';
+                    }
+                } else if (ret[col] == "maybe") {
+                    answer.push(String.fromCharCode(col + 97));
+                    if (failed[line] == undefined) failed[line] = [];
+                    failed[line][col] = "maybe";
+                } else if (ret[col] == true) {
+                    answer.push(String.fromCharCode(col + 97));
+                }
+            }
+            if (failed[line]) {
+                let allempty = true;
+                for (let col = 0; col < coords[line].length; col++) {
+                    if (ret[col] !== "empty") {
+                        allempty = false;
+                        break;
+                    }
+                }
+                if (allempty) {
+                    for (let col = 0; col < coords[line].length; col++) {
+                        failed[line][col] = "maybe"; // tag whole line as inacurate
+                    }
+                }
+            }
+            if (answer.length == 0) {
+                answers.push("99");
+            } else {
+                answers.push(answer.join("/"));
+            }
+        }
+
+        return { answers, failed, errors };
+    }
+
+
+    function getAnswers_opencv(image, coords, dx = 0, dy = 0) {
         // get questions in normalized image according to given coords
         let failed = [];
         let answers = [];
@@ -793,7 +917,8 @@ const checker = (() => {
                 }
                 let rect = new cv.Rect(ox, oy, bb.w + 10, bb.h + 10); // take more space, gives a better chance to checkBox to find the actual box
                 let mask = image.getRegion(rect);
-                switch (checkBox(mask)) {
+                let state = checkBox(mask);
+                switch (state) {
                     case "empty": // empty means no box found at all, just ignore and consider not ticked
                         if (failed[line] == undefined) failed[line] = [];
                         failed[line][col] = "empty";
@@ -813,6 +938,23 @@ const checker = (() => {
                         break;
                     case false:
                         break;
+                }
+                if (CREATETRAINDATA) {
+                    if (state == true) {
+                        state = "yes";
+                    } else if (state == false) {
+                        state = "no";
+                    }
+                    if (ox + 40 >= image.sizes[1]) {
+                        ox = image.sizes[1] - 41;
+                    }
+                    if (oy + 40 >= image.sizes[0]) {
+                        oy = image.sizes[0] - 41;
+                    }
+                    let rect = new cv.Rect(ox, oy, 40, 40); // take more space, gives a better chance to checkBox to find the actual box
+                    let img = image.getRegion(rect).copy();
+                    let hash = require('crypto').createHash('md5').update(img.getData()).digest("hex");
+                    cv.imwrite(path.join("tensorflow","train",state, hash+".jpg"), img);
                 }
             }
             if (failed[line]) {
@@ -837,6 +979,8 @@ const checker = (() => {
         }
         return { answers, failed, errors };
     }
+
+    const getAnswers=CREATETRAINDATA?getAnswers_opencv:getAnswers_tensorflow
 
     function getResult(image, template, dx, dy) {
         // process according to this single template
@@ -1420,13 +1564,13 @@ const pdf = (() => {
     async function writePDF(path, image) {
         let pdfDoc;
         if (fs.existsSync(path)) {
-            pdfDoc=await PDFDocument.load(fs.readFileSync(path));
+            pdfDoc = await PDFDocument.load(fs.readFileSync(path));
         } else {
-            pdfDoc=await PDFDocument.create();
+            pdfDoc = await PDFDocument.create();
         }
-        const page=pdfDoc.addPage([210,297]);
-        const jpgImage=await pdfDoc.embedJpg(cv.imencode(".jpg",image,[cv.IMWRITE_JPEG_QUALITY, 25]));
-        page.drawImage(jpgImage, {x:0,y:0,width:210,height:297});
+        const page = pdfDoc.addPage([210, 297]);
+        const jpgImage = await pdfDoc.embedJpg(cv.imencode(".jpg", image, [cv.IMWRITE_JPEG_QUALITY, 25]));
+        page.drawImage(jpgImage, { x: 0, y: 0, width: 210, height: 297 });
         const pdfBytes = await pdfDoc.save();
         fs.writeFileSync(path, pdfBytes);
     }

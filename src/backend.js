@@ -298,10 +298,10 @@ let actions = {
             dy = righttemplate.group[0][0].y - group.y;
         }
 
-        if (dy<-2) dy=-2;
-        if (dy>2) dy=2;
-        if (dx<-2) dx=-2;
-        if (dx>2) dx=2;
+        if (dy < -2) dy = -2;
+        if (dy > 2) dy = 2;
+        if (dx < -2) dx = -2;
+        if (dx > 2) dx = 2;
 
         ret.answers = answers[best].answers;
         ret.noma = omr.checker.getNoma(warped, righttemplate.noma, -dx, -dy);
@@ -353,10 +353,10 @@ let actions = {
         let righttemplate = template;
         dx = righttemplate.group[0][0].x - group.x;
         dy = righttemplate.group[0][0].y - group.y;
-        if (dy<-2) dy=-2;
-        if (dy>2) dy=2;
-        if (dx<-2) dx=-2;
-        if (dx>2) dx=2;
+        if (dy < -2) dy = -2;
+        if (dy > 2) dy = 2;
+        if (dx < -2) dx = -2;
+        if (dx > 2) dx = 2;
         // shift warped dx and dy
 
         let result = omr.checker.getResult(warped, righttemplate, -dx, -dy);
@@ -375,7 +375,7 @@ let actions = {
         let image = await readFile(path);
         let cropped = omr.utils.cropNormalizedCorners(corners, image);
         ret.image = cv.imencode(".jpg", cropped).toString("base64");
-        ret.path=path;
+        ret.path = path;
         return ret;
     },
     "file-original": async function ({ path, corners }) {
@@ -766,7 +766,7 @@ let actions = {
             return [p1, p2, p3, p4];
         }
 
-        warpedScan=warpedScan.cvtColor(cv.COLOR_GRAY2RGB);
+        warpedScan = warpedScan.cvtColor(cv.COLOR_GRAY2RGB);
 
         let lineWidth = Math.floor(3 * tplimage.sizes[0] / omr.REFSIZE); // width is proportional to actual image size, for REFSIZE, width is 6
         // tick noma boxes
@@ -804,16 +804,16 @@ let actions = {
             }
         }
 
-        let p=fspath.join(fspath.dirname(exportpath),scan.noma+".pdf");
-        if (template.page==1 && fs.existsSync(p)) {
-            try {fs.rmSync(p);} catch (_) {
+        let p = fspath.join(fspath.dirname(exportpath), scan.noma + ".pdf");
+        if (template.page == 1 && fs.existsSync(p)) {
+            try { fs.rmSync(p); } catch (_) {
                 return false;
             }
         }
 
         await omr.pdf.writePDF(p, warpedScan);
 
-//        cv.imwrite(exportpath, warpedScan, [cv.IMWRITE_JPEG_QUALITY, 25]);
+        //        cv.imwrite(exportpath, warpedScan, [cv.IMWRITE_JPEG_QUALITY, 25]);
         return true;
     },
     "export-deletejpg": function ({ path }) {
@@ -868,7 +868,7 @@ let actions = {
         pageidcache = {};
         // delete all template files in path
         path = fspath.join(path, "template"); // template directory in project
-        let bytes={};
+        let bytes = {};
         for (let k in groups) {
             let config = [];
             let group = groups[k];
@@ -879,14 +879,14 @@ let actions = {
                 }
                 for (let i = 0; i < 48 && i + p < group.length; i++) {
                     let q = [];
-                    for (let j = 0; j < group[i+p]; j++) {
+                    for (let j = 0; j < group[i + p]; j++) {
                         q.push({});
                     }
                     tpl.questions.push(q);
                 }
                 config.push(tpl);
             }
-            bytes["template"+k+".pdf"]=await omr.pdf.templateToPDF(config, strings);
+            bytes["template" + k + ".pdf"] = await omr.pdf.templateToPDF(config, strings);
         }
         // delete jpg and pdf from template directory
         let files = fs.readdirSync(path, { withFileTypes: true });
@@ -896,7 +896,7 @@ let actions = {
                 fs.rmSync(fspath.join(path, files[i].name));
             }
         }
-        for(let f in bytes) {
+        for (let f in bytes) {
             fs.writeFileSync(fspath.join(path, f), bytes[f]);
         }
         return true;
