@@ -37,7 +37,7 @@ setConstant('src/main.js', "DEBUG", "false");
 setConstant('src/omr.js', "DEBUG", "false");
 setConstant('src/main.js', "VERSION", '"' + versions + '"');
 
-console.log("Creatin version " + versions);
+console.log("Creating version " + versions);
 
 const APP_NAME = "easyOMR"
 const APP_DIR = path.resolve(__dirname, './' + APP_NAME + '-win32-x64');

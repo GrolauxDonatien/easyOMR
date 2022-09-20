@@ -1,6 +1,6 @@
 const cv = require("opencv4nodejs");
 const fs = require("fs");
-const path = require("path");
+const fspath = require("path");
 const { Point2, Size } = cv;
 const { Poppler } = require("node-poppler");
 const { PDFDocument, StandardFonts, rgb, PDFImage } = require("pdf-lib");
@@ -261,8 +261,8 @@ const utils = (() => {
         return target.warpPerspective(matrix, new Size(image.sizes[1], image.sizes[0]));
     }
 
-    function imageDenoised(image) {
-        return image.gaussianBlur(new Size(5, 5), 1.0);
+    function imageDenoised(image, level=1.0) {
+        return image.gaussianBlur(new Size(5, 5), level);
     }
 
     function imageEdged(image) {
@@ -954,7 +954,7 @@ const checker = (() => {
                     let rect = new cv.Rect(ox, oy, 40, 40); // take more space, gives a better chance to checkBox to find the actual box
                     let img = image.getRegion(rect).copy();
                     let hash = require('crypto').createHash('md5').update(img.getData()).digest("hex");
-                    cv.imwrite(path.join("tensorflow","train",state, hash+".jpg"), img);
+                    cv.imwrite(fspath.join("tensorflow","train",state, hash+".jpg"), img);
                 }
             }
             if (failed[line]) {
@@ -1583,6 +1583,206 @@ const pdf = (() => {
     }
 })();
 
+let normalizeOptions={
+    denoise:1.0,
+    edged:true
+}
+
+function getNormalizedImage({path, image, template, corners, strings}) {
+    let ret = {
+        width: image.sizes[1],
+        height: image.sizes[0],
+    }
+    if (!utils.isImageA4(image)) {
+        ret.error = strings.A4Error;
+        ret.group = "99";
+        ret.noma = "XXXXXX";
+    };
+    let denoised, edged, group, warped;
+    let _denoise, _edged;
+    for(let attempt=0; attempt<4; attempt++) {
+        _denoise=((attempt<2)?normalizeOptions.denoise:(normalizeOptions.denoise==1.0?0.5:1.0));
+        _edged=((attempt%2==0)?normalizeOptions.edged:!normalizeOptions.edged);
+        denoised = utils.imageDenoised(image, _denoise);
+        edged = utils.imageThreshold(denoised, _edged);
+        if (corners == null) {
+            ret.corners = utils.findCornerPositions(edged);
+        } else {
+            ret.corners = corners;
+        }
+        if ((ret.corners.br.x - ret.corners.tl.x) * (ret.corners.br.y - ret.corners.tl.y) / (ret.width * ret.height) < 0.5) {
+            // corners seem wacky, try again with more sensitivity
+            continue;
+        } else {
+            warped = utils.cropNormalizedCorners(ret.corners, edged);
+            if (template[0].type == "custom") { // no group management for custom templates, just assume group "a"
+                group = {
+                    x: AREA_GROUP.x1,
+                    y: AREA_GROUP.y1,
+                    group: "a"
+                }
+                break; // accept this has a success !
+            } else {
+                group = checker.getGroup(warped);
+                if (group.group != null) break;
+            }
+        }
+    }
+    // next time start with current config
+    normalizeOptions.denoise=_denoise;
+    normalizeOptions.edged=_edged;
+    ret.pageid = utils.findPageIdArea(warped, AREA_GROUP.x1 - group.x, AREA_GROUP.y1 - group.y);
+    ret.filename = fspath.basename(path);
+
+    if (group.group == null) {
+        ret.error = strings.groupError;
+        ret.group = "99";
+        ret.noma = "XXXXXX";
+    }
+
+    return {
+        denoised, edged, warped, group, ret
+    }
+}
+
+function outer(r1, r2) {
+    let x1 = Math.min(r1.x, r2.x);
+    let y1 = Math.min(r1.y, r2.y);
+    let x2 = Math.max(r1.x + r1.w, r2.x + r2.w);
+    let y2 = Math.max(r1.y + r1.h, r2.y + r2.h);
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+}
+
+async function getTemplatePageId(projectpath, template, pageidcache) {
+    let path = fspath.join(fspath.join(projectpath, "template"), template.filename);
+    if (path in pageidcache &&
+        JSON.stringify(template.corners) == JSON.stringify(pageidcache[path].corners) &&
+        JSON.stringify(template.pageid) == JSON.stringify(pageidcache[path].pageid)) {
+        return pageidcache[path].image;
+    } else {
+        let entry = {};
+        let image = await readFile(path);
+        let denoised = utils.imageDenoised(image);
+        let edged = utils.imageThreshold(denoised, true);
+        entry.corners = template.corners;
+        let warped = utils.cropNormalizedCorners(entry.corners, edged);
+        entry.pageid = template.pageid;
+        entry.image = utils.extractPageIdArea(warped, entry.pageid);
+        pageidcache[path] = entry;
+        return entry.image;
+    }
+}
+
+
+const IMAGETYPES = ["bmp", "pbm", "pgm", "ppm", "sr", "ras", "jpeg", "jpg", "jpe", "jp2", "tiff", "tif", "png"];
+
+
+function isImage(fn) {
+    return IMAGETYPES.indexOf(fspath.extname(fn).substring(1).toLowerCase()) != -1;
+}
+
+function isPDF(fn) {
+    return fn.toLowerCase().endsWith(".pdf");
+}
+
+function isXlsx(fn) {
+    return fn.toLowerCase().endsWith(".xlsx");
+}
+
+async function readFile(path) {
+    let dropDotIdx = path.indexOf(":", 3);
+    if (dropDotIdx != -1) path = path.substring(0, dropDotIdx);
+    let image;
+    if (isImage(path)) {
+        // cv.imread fails for path with utf8 characters
+        let buffer = fs.readFileSync(path);
+        image = cv.imdecode(buffer);
+    } else {
+        let sp = path.split("@");
+        if (sp.length == 2 && isPDF(sp[0]) && sp[1] == "" + parseInt(sp[1])) {
+            let buffer = await pdf.exportPNG(sp[0], parseInt(sp[1]));
+            image = cv.imdecode(buffer);
+        } else {
+            throw new Error("Invalid file " + path);
+        }
+    }
+    return image;
+}
+
+async function computeDrift({template, projectpath, warped, group, ret, pageidcache}) {
+    let dx = 0;
+    let dy = 0;
+
+    let scores = [];
+    let idx;
+    for (let i = 0; i < template.length; i++) {
+        idx = i;
+        if (group.group != template[i].thisgroup) continue; // wrong group
+        let pageid = utils.extractPageIdArea(warped, outer(ret.pageid, template[i].pageid));
+        let thisid = await getTemplatePageId(projectpath, template[i], pageidcache);
+        let score = utils.pagesSimilarity(pageid, thisid);
+        scores.push({
+            score, template: template[i], pageid, thisid
+        });
+    }
+    // we just take the template with the higher similarity
+    // first we score remaining templates
+    if (scores.length == 0) {
+        ret.error = strings.templateError + group.group;
+        ret.group = "99";
+        ret.noma = "XXXXXX";
+        return ret;
+    }
+    scores.sort((a, b) => b.score.maxVal - a.score.maxVal); // sort scores, higher first
+    let answers = [];
+    // attempt getting the answers, using best scoring template first
+    let best = -1;
+    for (let j = 0; j < scores.length; j++) {
+        let righttemplate = scores[j].template;
+        if (righttemplate.type !== "custom") { // no group for custom templates => no group position shift
+            dx = righttemplate.group[0][0].x - group.x;
+            dy = righttemplate.group[0][0].y - group.y;
+        }
+        // shift warped dx and dy
+        let answer = checker.getAnswers(warped, righttemplate.questions, -dx, -dy);
+        answers.push(answer);
+        if (answer.errors < answer.answers.length * 0.1) { // low level of errors, just go for it
+            best = j;
+            break;
+        }
+    }
+    if (best == -1) {
+        best = 0;
+        let max = answers[0].errors / answers[0].answers.length;
+        for (let j = 1; j < scores.length; j++) {
+            let cmax = answers[j].errors / answers[j].answers.length;
+            if (cmax < max) {
+                best = j;
+                max = cmax;
+            }
+        }
+    }
+    let righttemplate = scores[best].template;
+    if (righttemplate.type !== "custom") { // no group for custom templates => no group position shift
+        dx = righttemplate.group[0][0].x - group.x;
+        dy = righttemplate.group[0][0].y - group.y;
+    }
+
+    if (dy<-2) dy=-2;
+    if (dy>2) dy=2;
+    if (dx<-2) dx=-2;
+    if (dx>2) dx=2;
+
+    ret.answers = answers[best].answers;
+    ret.noma = checker.getNoma(warped, righttemplate.noma, -dx, -dy);
+    ret.group = group.group;
+    ret.failed = answers[best].failed;
+    ret.errors = answers[best].errors;
+    ret.template = righttemplate.filename;
+    ret.dx = dx;
+    ret.dy = dy;
+}
+
 module.exports = {
-    templater, checker, utils, REFSIZE, colors, project, pdf, debug(d) { DEBUG = d; }, AREA_GROUP
+    getNormalizedImage, computeDrift, templater, checker, utils, REFSIZE, colors, project, pdf, debug(d) { DEBUG = d; }, AREA_GROUP
 }
