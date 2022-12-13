@@ -210,12 +210,14 @@ let actions = {
         let dy = 0;
 
         let righttemplate = template;
-        dx = righttemplate.group[0][0].x - group.x;
-        dy = righttemplate.group[0][0].y - group.y;
-        if (dy < -2) dy = -2;
-        if (dy > 2) dy = 2;
-        if (dx < -2) dx = -2;
-        if (dx > 2) dx = 2;
+        if ("group" in righttemplate) {
+            dx = righttemplate.group[0][0].x - group.x;
+            dy = righttemplate.group[0][0].y - group.y;
+            if (dy < -2) dy = -2;
+            if (dy > 2) dy = 2;
+            if (dx < -2) dx = -2;
+            if (dx > 2) dx = 2;    
+        }
         // shift warped dx and dy
 
         let result = omr.checker.getResult(warped, righttemplate, -dx, -dy);

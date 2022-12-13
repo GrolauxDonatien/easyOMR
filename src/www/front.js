@@ -796,6 +796,7 @@ const project = (() => {
                     // nothing really changed
                     if (currentScan.group == tpl.thisgroup && currentScan.template == tpl.filename) continue;
                     api('file-scan-fixed', { path, template: tpl, strings: fileScanStrings, corners: currentScan.corners }, (result) => {
+                        if (currentScan == null) currentScan = {};
                         delete currentScan.error; // reset eventual error
                         for (let k in result) {
                             currentScan[k] = result[k];

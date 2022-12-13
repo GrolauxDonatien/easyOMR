@@ -8,11 +8,12 @@ const tf = require('@tensorflow/tfjs')
 const tfn = require("@tensorflow/tfjs-node");
 
 const CREATETRAINDATA = false;
+const OPENCV = true;
 
 let omrmodel;
 
 async function loadOMRModel() {
-    const handler = tfn.io.fileSystem("resources/model.json");
+    const handler = tfn.io.fileSystem(fspath.resolve(__dirname,"../resources/model.json"));
     omrmodel = await tf.loadLayersModel(handler);
 }
 
@@ -980,18 +981,23 @@ const checker = (() => {
         return { answers, failed, errors };
     }
 
-    const getAnswers=CREATETRAINDATA?getAnswers_opencv:getAnswers_tensorflow
+    const getAnswers=(CREATETRAINDATA||OPENCV)?getAnswers_opencv:getAnswers_tensorflow
 
     function getResult(image, template, dx, dy) {
         // process according to this single template
         let noma = getNoma(image, template.noma, dx, dy);
         let answers = getAnswers(image, template.questions, dx, dy);
-        let group = getAnswers(image, template.group, dx, dy);
+        let group;
+        if ("thisgroup" in template) {
+            group=template.thisgroup;
+        } else {
+            group = getAnswers(image, template.group, dx, dy).answers[0];
+        }
         return {
             noma: noma,
             answers: answers.answers,
             failed: answers.failed,
-            group: group.answers[0],
+            group: group,
             errors: answers.errors + group.errors
         }
     }

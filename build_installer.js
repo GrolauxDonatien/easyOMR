@@ -54,6 +54,9 @@ if (REPACKAGE) {
 
     child_process.execSync("electron-packager . --platform=win32 --arch=x64 --icon=" + APP_ICON + " " + APP_NAME);
     console.log("Stuff is packaged");
+    // remove tensorflow training folder
+    fs.rmSync(path.resolve(APP_DIR, './resources/app/tensorflow'), { recursive: true, force: true });
+
     // clean up packaged stuff to make installer much smaller
     const OPENCV_DIR = path.resolve(APP_DIR, './resources/app/node_modules/opencv-build/opencv/build');
     let keep = ["bin", "win-install"];
