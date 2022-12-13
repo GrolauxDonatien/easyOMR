@@ -1616,7 +1616,10 @@ function getNormalizedImage({path, image, template, corners, strings}) {
         } else {
             ret.corners = corners;
         }
-        if ((ret.corners.br.x - ret.corners.tl.x) * (ret.corners.br.y - ret.corners.tl.y) / (ret.width * ret.height) < 0.5) {
+        let {br,bl,tr,tl}=ret.corners;
+        if ((br.x - tl.x) * (br.y - tl.y) / (ret.width * ret.height) < 0.5
+        || (Math.abs(tl.x-bl.x)/ret.width>0.1) || (Math.abs(tr.x-br.x)/ret.width>0.1) || (Math.abs(tl.y-tr.y)/ret.height>0.1) || (Math.abs(bl.y-br.y)/ret.height>0.1) 
+        ) {
             // corners seem wacky, try again with more sensitivity
             continue;
         } else {
