@@ -408,7 +408,7 @@ const viewer = (() => {
                 let li = document.createElement("LI");
                 li.innerHTML = list[i];
                 if (li.innerText.length > 30) {
-                    li.setAttribute("title",li.innerText);
+                    li.setAttribute("title", li.innerText);
                     li.innerText = li.innerText.substring(0, 10) + "..." + li.innerText.substring(list[i].length - 10);
                 }
                 ul.appendChild(li);
@@ -479,9 +479,9 @@ const viewer = (() => {
                     context.strokeStyle = drawDirectives[i].color;
                     context.lineWidth = 2;
                     let coords = drawDirectives[i].coords;
-                    for (let i = 0; i < coords.length; i++) {
-                        if (coords[i]) for (let j = 0; j < coords[i].length; j++) {
-                            let b = coords[i][j];
+                    for (let j = 0; j < coords.length; j++) {
+                        if (coords[j]) for (let k = 0; k < coords[j].length; k++) {
+                            let b = coords[j][k];
                             if (b) context.rect((b.x + dx) * ar, (b.y + dy) * ar, b.w * ar, b.h * ar);
                         }
                     }
@@ -524,7 +524,7 @@ const viewer = (() => {
                     let tgt = root.querySelectorAll("li")[idx];
                     tgt.classList.add("selected");
                     nav.bringIntoView(tgt);
-                } else if (Number.isInteger(n) && n>=0 && n<elements.length) {
+                } else if (Number.isInteger(n) && n >= 0 && n < elements.length) {
                     select(elements[n]);
                 }
             }

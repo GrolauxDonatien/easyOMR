@@ -666,6 +666,10 @@ const project = (() => {
                     greencoords.push(coords[v]);
                 }
             }
+            for (let j = 0; j < tpl.questions.length; j++) {
+                let coords = tpl.questions[j];
+                v.drawCoords([coords], "lightgray");
+            }
             v.drawCoords([greencoords], "green");
             v.drawCoords([bluecoords], "blue");
             v.drawCoords([redcoords], "red");
