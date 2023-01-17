@@ -446,6 +446,10 @@ const viewer = (() => {
             drawDirectives.push({ text, x, y, color });
         }
 
+        function drawTextRight(text, x, y, color) {
+            drawDirectives.push({ text, x, y, color, align: "right" });
+        }
+
         function drawBezier(dots, color) {
             drawDirectives.push({ bezier: dots, color });
         }
@@ -491,7 +495,12 @@ const viewer = (() => {
                     context.beginPath();
                     context.fillStyle = drawDirectives[i].color;
                     context.font = (30 * ar) + "px arial";
-                    context.fillText(drawDirectives[i].text, (drawDirectives[i].x + dx) * ar, (drawDirectives[i].y + dy) * ar);
+                    if (drawDirectives[i].align === "right") {
+                        let s = context.measureText(drawDirectives[i].text);
+                        context.fillText(drawDirectives[i].text, (drawDirectives[i].x + dx) * ar - s.width, (drawDirectives[i].y + dy) * ar);
+                    } else {
+                        context.fillText(drawDirectives[i].text, (drawDirectives[i].x + dx) * ar, (drawDirectives[i].y + dy) * ar);
+                    }
                     context.stroke();
                 } else if ("bezier" in drawDirectives[i]) {
                     context.beginPath();
@@ -549,6 +558,7 @@ const viewer = (() => {
             },
             drawCoords,
             drawText,
+            drawTextRight,
             drawBezier,
             redraw,
             select,

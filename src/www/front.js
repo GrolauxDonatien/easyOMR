@@ -112,7 +112,7 @@ const project = (() => {
                                     if (allDots[i] < tx) tx = allDots[i];
                                     if (allDots[i + 1] < ty) ty = allDots[i + 1];
                                 }
-                                v.drawText((gcount + 1 + i) + ")", tx, ty - 10, "green");
+                                v.drawTextRight((gcount + 1 + i) + ")", tx - 8, ty + 13, "green");
                             }
                         }
                     }
@@ -367,7 +367,9 @@ const project = (() => {
                     }
                     context.fillStyle = "blue";
                     context.font = (30 * ar) + "px arial";
-                    context.fillText((gcount + 1 + i) + ")", (tx + dx) * ar, (ty - 10 + dy) * ar);
+                    let qtext = (gcount + 1 + i) + ")";
+                    let s = context.measureText(qtext);
+                    context.fillText(qtext, (tx + dx) * ar - s.width - 4, (ty - 10 + dy) * ar + s.actualBoundingBoxAscent + s.actualBoundingBoxDescent);
                     context.stroke();
                 }
             }
@@ -1729,7 +1731,7 @@ const project = (() => {
                 api('export-excel', r, lock.destroy, lock.destroy);
             }, 100);
         },
-        exportCorrectedScans(){
+        exportCorrectedScans() {
             let lock = lockDisplay(exportStrings.running);
             let r = prepareExport("dummy");
             let keys = Object.keys(r.lines);
@@ -1738,10 +1740,10 @@ const project = (() => {
             for (let i = 0; i < current.template.length; i++) {
                 let g = current.template[i].thisgroup;
                 if (!(g in gcount)) gcount[g] = 1;
-                let tpl={};
+                let tpl = {};
                 templates[current.template[i].filename] = tpl;
                 Object.assign(tpl, current.template[i]);
-                tpl.page=gcount[g];
+                tpl.page = gcount[g];
                 gcount[g]++;
             }
 
