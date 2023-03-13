@@ -66,11 +66,13 @@ const project = (() => {
                 let image = new Image();
                 image.onload = () => {
                     v.drawImage(image);
-                    if (info.noma == null) {
-                        v.drawText(errorStrings.nomaTemplate, 600, 70, "red");
-                        v.drawText(errorStrings.retryTemplate, 600, 100, "red");
-                    } else {
-                        v.drawCoords(info.noma, "blue");
+                    if (info.type != "customqr*") {
+                        if (info.noma == null) {
+                            v.drawText(errorStrings.nomaTemplate, 600, 70, "red");
+                            v.drawText(errorStrings.retryTemplate, 600, 100, "red");
+                        } else {
+                            v.drawCoords(info.noma, "blue");
+                        }
                     }
                     if ("group" in info) {
                         if ("abcdef".indexOf(info.thisgroup[0]) == -1) {
@@ -87,7 +89,7 @@ const project = (() => {
                         v.drawText(errorStrings.retryTemplate, 10, 750, "red");
                     } else {
                         v.drawCoords(info.questions, "green");
-                        if (info.type == "custom") {
+                        if (info.type.startsWith("custom")) {
                             let coords = info.questions;
                             for (let i = 0; i < coords.length; i++) if (coords[i]) {
                                 let allDots = [];
@@ -1762,6 +1764,24 @@ const project = (() => {
             }
             setTimeout(() => loop(0), 100);
         },
+        createCopies(n) {
+            let lock = lockDisplay(exportStrings.running);
+            lock.length(n);
+            // loop through setTimeouts so that the browser has a chance to refresh the display
+            function loop(i) {
+                if (!(i < n)) {
+                    lock.destroy();
+                    return;
+                }
+                lock.progress(i);
+                count = 20;
+                if (i + count >= n) count = n - i;
+                api("create-copy", { path: current.path, templates: current.template, count },
+                    () => { setTimeout(() => { loop(i + count) }, 1); }, // leave a bit of time for the ui to refresh for example if the window is resized
+                    () => { loop(i + count); });
+            }
+            setTimeout(() => loop(0), 100);
+        },
         exportMoodle() {
             let lock = lockDisplay(exportStrings.running);
             let r = prepareExport("dummy");
@@ -1850,6 +1870,8 @@ nav.addSelectEvent((panel) => {
             }
             switch (project.current().template[0].type) {
                 case "custom":
+                case "customqr":
+                case "customqr*":
                 case "grid":
                     document.getElementById("exportMoodle").style.display = "none";
                     document.getElementById("exportMoodleZip").style.display = "none";
@@ -1862,24 +1884,30 @@ nav.addSelectEvent((panel) => {
             break;
         case "template":
             if (redrawTemplate) redrawTemplate();
+            document.getElementById("template-create-copies").style.display = "none";
             if (templates.length == 0) {
                 document.getElementById("template-edit-button").style.display = "inline-block";
             } else {
                 document.getElementById("template-edit-button").style.display = "none";
                 let type = templates[0].type;
                 for (let i = 1; i < templates.length; i++) {
-                    if (type != templates[i].type) {
+                    if (type != templates[i].type.substring(0, type.length)) {
                         alert(errorStrings.mixedTemplates);
                         return;
                     }
                 }
-                if (type == "grid" || type == "custom") {
+                if (type == "grid" || type.startsWith("custom")) {
                     document.getElementById("template-edit-button").style.display = "inline-block";
+                }
+                if (type.startsWith("customqr")) {
+                    document.getElementById("template-create-copies").style.display = "inline-block";
                 }
             }
             break;
         case "edit-template":
             project.runTemplateEditor(document.querySelector("#edit-template .editor"));
+            break;
+        case "create-copies":
             break;
         case "scans":
             if (redrawScan) redrawScan();
@@ -1969,6 +1997,29 @@ document.getElementById("template-edit-button").addEventListener('click', () => 
                         }
                     });
                 },
+                [customTemplateStrings.editTemplateChoice4]: function () {
+                    diag.destroy();
+                    diag = dialog({
+                        title: customTemplateStrings.editTemplateCustomTitle,
+                        content: customTemplateStrings.editTemplateCustom,
+                        buttons: {
+                            [strings.continue]: function () {
+                                api("template-customQR-copy", {
+                                    path: joinPath(project.current().path, "/template"),
+                                    lang: location.href.substring(location.href.length - 7, location.href.length - 5)
+                                }, () => {
+                                    diag.destroy();
+                                }, (e) => {
+                                    alert(e);
+                                    diag.destroy();
+                                });
+                            },
+                            [strings.cancel]: function () {
+                                diag.destroy();
+                            }
+                        }
+                    });
+                },
                 [strings.cancel]: function () {
                     diag.destroy();
                 }
@@ -1980,10 +2031,32 @@ document.getElementById("template-edit-button").addEventListener('click', () => 
                 nav.select("edit-template");
                 break;
             case "custom":
+            case "customqr":
+            case "customqr*":
                 customTemplateEditor();
                 break;
         }
     }
+});
+document.getElementById("template-create-copies").addEventListener('click', () => {
+    let diag = dialog({
+        title: customTemplateStrings.createCopiesTitle,
+        content: customTemplateStrings.createCopies,
+        html: '<input type="number" id="number_of_copies" min="1" max="9999" value="1">',
+        buttons: {
+            [strings.continue]: function () {
+                let v = parseInt(diag.content.querySelector('input').value);
+                if (!isNaN(v) && v > 0) {
+                    project.createCopies(v);
+                }
+                diag.destroy();
+            },
+            [strings.cancel]: function () {
+                diag.destroy();
+            }
+        }
+    });
+    diag.content.querySelector('input').addEventListener('keydown', (e) => { e.stopPropagation(); });
 });
 
 project.setNav();

@@ -11,6 +11,10 @@ const XLSX = require('xlsx');
 const AdmZip = require("adm-zip");
 const { AREA_GROUP } = require('./omr');
 const IMAGETYPES = ["bmp", "pbm", "pgm", "ppm", "sr", "ras", "jpeg", "jpg", "jpe", "jp2", "tiff", "tif", "png"];
+const uuidv4 = require('uuid').v4;
+const QRCode = require("qrcode");
+const MemoryStream = require('memorystream');
+
 
 const AsyncFunction = (async () => { }).constructor;
 const ZIPCUTSIZE = 30 * 1024 * 1024; // when exporting clear scans for Moodle, zip files are cut after 25 MB is reached
@@ -141,7 +145,7 @@ let actions = {
             ret.corners = omr.utils.findCornerPositions(edged);
         }
         let warped = omr.utils.cropNormalizedCorners(ret.corners, edged);
-        ret.type = omr.templater.typeOfTemplate(warped);
+        ret.type = omr.templater.typeOfTemplate(omr.utils.cropNormalizedCorners(ret.corners, omr.utils.imageThreshold(image, true)));
         ret.pageid = omr.utils.findPageIdArea(warped);
         let cnts = omr.utils.findContoursExceptBorder(warped);
         ret.filename = fspath.basename(path);
@@ -157,8 +161,13 @@ let actions = {
                 ret.thisgroup = a.answers[0][0];
                 break;
             case "custom":
+            case "customqr":
                 ret.thisgroup = "a"; // only group a for mixed templates
                 ret.questions = omr.templater.getQuestions(cnts, 1, warped, logger);
+                break;
+            case "customqr*":
+                ret.thisgroup = "a"; // only group a for mixed templates
+                ret.questions = omr.templater.getQuestions(cnts, 0, warped, logger);
                 break;
         }
         return ret;
@@ -168,8 +177,8 @@ let actions = {
 
         let projectpath = fspath.dirname(fspath.dirname(path));
         let image = await readFile(path);
-        let {warped, group, ret}=omr.getNormalizedImage({strings, path, image,template,corners});
-        if (ret.group!="99") await omr.computeDrift({template, projectpath, warped,group,ret, pageidcache});
+        let { warped, group, ret } = omr.getNormalizedImage({ strings, path, image, template, corners });
+        if (ret.group != "99") await omr.computeDrift({ template, projectpath, warped, group, ret, pageidcache });
         return ret;
     },
     "file-scan-fixed": async function ({ path, template, strings, corners = null }) {
@@ -216,7 +225,7 @@ let actions = {
             if (dy < -2) dy = -2;
             if (dy > 2) dy = 2;
             if (dx < -2) dx = -2;
-            if (dx > 2) dx = 2;    
+            if (dx > 2) dx = 2;
         }
         // shift warped dx and dy
 
@@ -574,6 +583,115 @@ let actions = {
         cv.imwrite(exportpath, tplimage, [cv.IMWRITE_JPEG_QUALITY, 25]);
         return true;
     },
+    "create-copy": async function ({ path, templates, count }) {
+        const Point2 = omr.utils.cv.Point2;
+        const Size = omr.utils.cv.Size;
+        const Rect = omr.utils.cv.Rect;
+        let copies = fspath.join(path, "template", "copies");
+        if (!fs.existsSync(copies)) fs.mkdirSync(copies);
+        let tplimages = [];
+        let qrcoords = [];
+        for (let i = 0; i < templates.length; i++) {
+            let template = templates[i];
+            let tplimage = await readFile(fspath.join(path, "template", formatFilename(template.filename)));
+            try {
+                tplimage = tplimage.bgrToGray();
+            } catch (_) { };
+            tplimages.push(tplimage);
+            const corners = template.corners;
+            let width = Math.floor(omr.REFSIZE / 1.4142);
+            let height = omr.REFSIZE;
+            let src = [
+                new Point2(corners.tl.x, corners.tl.y),
+                new Point2(corners.tr.x, corners.tr.y),
+                new Point2(corners.br.x, corners.br.y),
+                new Point2(corners.bl.x, corners.bl.y)
+            ]
+            let dst = [
+                new Point2(0, 0),
+                new Point2(width - 1, 0),
+                new Point2(width - 1, height - 1),
+                new Point2(0, height - 1)];
+            let matrix = cv.getPerspectiveTransform(src, dst);
+            let warped = tplimage.warpPerspective(matrix, new Size(width, height));
+            let ox = i == 0 ? omr.QR1.x : omr.QRS.x;
+            let oy = i == 0 ? omr.QR1.y : omr.QRS.y;
+            let qr = omr.templater.readQR(warped, ox, oy, false);
+            if (qr === null) return false;
+            // compute matrix from adjusted template back to original template image
+            let imatrix = matrix.inv();
+            // utility function to warp coordinates according to transformation matrix, returning Point2
+            function warpCoordinates(x, y, matrix) {
+                const matData = [
+                    [[x, y]]
+                ];
+                const src = new cv.Mat(matData, cv.CV_32FC2);
+                let result = src.perspectiveTransform(matrix).getDataAsArray();
+                return new Point2(result[0][0][0], result[0][0][1]);
+            }
+            qrcoords.push({
+                tl: warpCoordinates(qr.location.topLeftCorner.x + ox, qr.location.topLeftCorner.y + oy, imatrix),
+                tr: warpCoordinates(qr.location.topRightCorner.x + ox, qr.location.topRightCorner.y + oy, imatrix),
+                bl: warpCoordinates(qr.location.bottomLeftCorner.x + ox, qr.location.bottomLeftCorner.y + oy, imatrix),
+                br: warpCoordinates(qr.location.bottomRightCorner.x + ox, qr.location.bottomRightCorner.y + oy, imatrix),
+            })
+        }
+        const font = omr.utils.cv.FONT_HERSHEY_PLAIN;
+        for (let i = 0; i < count; i++) {
+            let id = uuidv4();
+            let exportpath = fspath.join(copies, id + ".pdf");
+            for (let t = 0; t < tplimages.length; t++) {
+                let img = tplimages[t];
+                let coords = qrcoords[t];
+                let x1 = Math.min(coords.tl.x, coords.bl.x);
+                let x2 = Math.max(coords.tr.x, coords.br.x);
+                let y1 = Math.min(coords.tl.y, coords.tr.y);
+                let y2 = Math.max(coords.bl.y, coords.br.y);
+                let p1 = new Point2(x1 - 5, y1 - 5);
+                let p2 = new Point2(x2 + 5, y1 - 5);
+                let p3 = new Point2(x2 + 5, y2 + 5);
+                let p4 = new Point2(x1 - 5, y2 + 5);
+
+                img.drawFillPoly([[p1, p2, p3, p4]], omr.colors.WHITE);
+                let c = templates[i].corners;
+                let tc;
+                if (t == 0) {
+                    tc = new Point2(c.tl.x + (c.tr.x - c.tl.x) / 100 * 3, c.tl.y + (c.bl.y - c.tl.y) / 100 * 17);
+                } else {
+                    tc = new Point2(c.tl.x + (c.tr.x - c.tl.x) / 100 * 3, c.tl.y + (c.bl.y - c.tl.y) / 100 * 7);
+                }
+                img.putText("ref:" + id, tc, font, 1, omr.colors.BLACK, 2);
+
+                // create qrcode & insert into img
+                let stream = new MemoryStream();
+
+                function stream2buffer(stream) {
+
+                    return new Promise((resolve, reject) => {
+
+                        const _buf = [];
+
+                        stream.on("data", (chunk) => _buf.push(chunk));
+                        stream.on("end", () => resolve(Buffer.concat(_buf)));
+                        stream.on("error", (err) => reject(err));
+
+                    });
+                }
+
+                await QRCode.toFileStream(stream, id+"/"+(t+1), { type:'png',
+                width:Math.min(x2-x1, y2-y1), 
+                margin:0,
+                errorCorrectionLevel:'H'});
+                let buf=await stream2buffer(stream);
+                let qrcode=cv.imdecode(buf);
+                qrcode.bgrToGray().copyTo(img.getRegion(new Rect(x1,y1,qrcode.sizes[1],qrcode.sizes[0])))
+
+                await omr.pdf.writePDF(exportpath, img);
+            }
+        }
+
+        return true;
+    },
     "correct-scan": async function ({ path, scan, template }) {
         let scanimage = await readFile(fspath.join(path, "scans", formatFilename(scan.filename)));
         let tplimage = await readFile(fspath.join(path, "template", formatFilename(template.filename)));
@@ -767,13 +885,30 @@ let actions = {
         let files = fs.readdirSync(src);
         for (let i = 0; i < files.length; i++) {
             let idx = files[i].indexOf("-" + lang + ".");
-            if (idx != -1 && (files[i].toLowerCase().endsWith(".docx") || files[i].toLowerCase().endsWith(".pdf"))) {
+            if (idx != -1
+                && (files[i].toLowerCase().endsWith(".docx") || files[i].toLowerCase().endsWith(".pdf"))
+                && files[i].toLowerCase().indexOf("qr") == -1) {
                 let dest = files[i].substring(0, idx) + files[i].substring(idx + 3);
                 fs.copyFileSync(fspath.join(src, files[i]), fspath.join(path, dest));
             }
         }
         return true;
-    }, "set-menu": async function (newMenu) {
+    },
+    "template-customQR-copy": async function ({ path, lang }) {
+        let src = fspath.resolve(__dirname, "../resources");
+        let files = fs.readdirSync(src);
+        for (let i = 0; i < files.length; i++) {
+            let idx = files[i].indexOf("-" + lang + ".");
+            if (idx != -1
+                && (files[i].toLowerCase().endsWith(".docx") || files[i].toLowerCase().endsWith(".pdf"))
+                && files[i].toLowerCase().indexOf("qr") != -1) {
+                let dest = files[i].substring(0, idx) + files[i].substring(idx + 3);
+                fs.copyFileSync(fspath.join(src, files[i]), fspath.join(path, dest));
+            }
+        }
+        return true;
+    },
+    "set-menu": async function (newMenu) {
         menuTemplate.label = newMenu.File;
         menuTemplate.submenu[0].label = newMenu.Language;
         menuTemplate.submenu[2].label = newMenu["About..."];

@@ -175,7 +175,7 @@ const lockDisplay = (msg) => {
     }
 };
 
-const dialog = ({ title, buttons, content }) => {
+const dialog = ({ title, buttons, content, html }) => {
     let main = document.createElement("DIV");
     main.classList.add("lock");
     let diag = document.createElement("DIV");
@@ -194,6 +194,9 @@ const dialog = ({ title, buttons, content }) => {
     diag.appendChild(contentEl);
     if (content) {
         contentEl.innerText = content;
+    }
+    if (html) {
+        contentEl.innerHTML += html;
     }
     let buttonBar = document.createElement("DIV");
     diag.appendChild(buttonBar);

@@ -6,6 +6,8 @@ const fs = require("fs");
 const fspath = require("path");
 const DEBUG = true;
 const VERSION = "1.0.44";
+const QR_code = "lkhglqksdlfd9876098HMLKJSDFH-1";
+
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) { // eslint-disable-line global-require

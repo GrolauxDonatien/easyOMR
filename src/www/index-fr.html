@@ -19,7 +19,8 @@
                     <pre>export</pre> : une fois les scans traités, les options d'export créeront des fichiers ici.
                 </li>
             </ul>
-            <p>Ces répertoires seront créés automatiquement si nécessaire. Les formats de fichier supportés sont jpg et pdf.</p>
+            <p>Ces répertoires seront créés automatiquement si nécessaire. Les formats de fichier supportés sont jpg et
+                pdf.</p>
         </div>
         <div class="main">
             <button id="openProject">Ouvrir un projet...</button>
@@ -43,6 +44,7 @@
             ouvre une boite de dialogue permettant de choisir le type souhaité.<br>
         </div>
         <div><label for="templateDirectory">Répertoire de template: </label><button id="templateDirectory"></button>
+            <button id="template-create-copies" style="float:right">Créer des copies...</button>
             <button id="template-edit-button" style="float:right">Edition...</button>
         </div>
         <div class="scanview" id="templateView">
@@ -67,6 +69,7 @@
         </div>
         <div class="editor"></div>
     </div>
+
     <div class="panel" id="edit-custom-template">
         <div class="hint">
             L'édition du template consiste à changer les groups qui forment une réponse.<br>
@@ -186,12 +189,12 @@
         <a data-id="export">Export<span></span></a>
     </div>
     <script>
-        localStorage.setItem("easyOMR-lang","fr");
-        const menuStrings= {
-            "File":"Fichier",
-            "Language":"Langue",
-            "About...":"A propos...",
-            "Exit":"Exit"
+        localStorage.setItem("easyOMR-lang", "fr");
+        const menuStrings = {
+            "File": "Fichier",
+            "Language": "Langue",
+            "About...": "A propos...",
+            "Exit": "Exit"
         }
         const fileScanStrings = {
             A4Error: "Mauvais format d'image",
@@ -208,8 +211,8 @@
             scans: "Scans",
             corrections: "Corrections",
             pointsInstruction: "Pour chaque question et chaque réponse, entrez dans la colonne Points la valeur de cette réponse pour cette question.",
-            createZip:"Création du/des zip...",
-            running:"Export en cours...",
+            createZip: "Création du/des zip...",
+            running: "Export en cours...",
 
         }
 
@@ -233,10 +236,13 @@ en dehors des cases`,
             editTemplatePickAChoice: `Que souhaitez-vous faire :
 1) Corriger des grilles de réponses provenant de Moodle ?
 2) Générer une grille de réponses, similaire mais indépendante de Moodle ?
-3) Créer un document mixant les questions et les cases de réponses ?`,
+3) Créer un document mixant les questions et les cases de réponses ?
+4) Comme 3), mais avec un QR code pour identifier les pages et éviter 
+d'écrire son nom sur chaque page ?`,
             editTemplateChoice1: "1) Grille Moodle",
             editTemplateChoice2: "2) Grille easyOMR",
             editTemplateChoice3: "3) Document Mixte",
+            editTemplateChoice4: "4) Document Mixte & QR",
             editTemplateMoodleTitle: "Utilisation sur une grille Moodle",
             editTemplateMoodle: `Pour utiliser easyOMR avec une grille de réponse de Moodle,
 il suffit de placer le PDF de la grille de réponse dans le répertoire de template de votre projet.`,
@@ -246,7 +252,12 @@ Si vous continuez, un document de base sera créé dans le répertoire template 
 Editez-le comme souhaité, en respectant les contraintes de format décrites.
 easyOMR ne peut pas travailler directement avec Word, mais pourra travailler avec un fichier PDF:
 Dans Word, Sélectionnez Fichier/Enregistrer sous/Double-cliquez Ce PC/Changez Type à PDF (*.pdf) et
-sauvez dans le répertoire de template de ce projet, en remplaçant le fichier pdf qui y est présent.`
+sauvez dans le répertoire de template de ce projet, en remplaçant le fichier pdf qui y est présent.`,
+            createCopiesTitle: `Créer des copies`,
+            createCopies: `Les questionnaires personnalisés avec code QR ne peuvent pas être imprimés directement à partir du template.
+        En effet, chaque copie possède un code QR unique afin de pouvoir les regrouper correctement ensembles.
+        Cette option vous permet de créer des copies, qui seront générées au format fichiers PDF.
+        Entrez le nombre de copies souhaitées : `
         }
 
         const errorStrings = {

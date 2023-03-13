@@ -6,6 +6,7 @@ const { Poppler } = require("node-poppler");
 const { PDFDocument, StandardFonts, rgb, PDFImage } = require("pdf-lib");
 const tf = require('@tensorflow/tfjs')
 const tfn = require("@tensorflow/tfjs-node");
+const jsQR = require("jsqr");
 
 const CREATETRAINDATA = false;
 const OPENCV = true;
@@ -13,7 +14,7 @@ const OPENCV = true;
 let omrmodel;
 
 async function loadOMRModel() {
-    const handler = tfn.io.fileSystem(fspath.resolve(__dirname,"../resources/model.json"));
+    const handler = tfn.io.fileSystem(fspath.resolve(__dirname, "../resources/model.json"));
     omrmodel = await tf.loadLayersModel(handler);
 }
 
@@ -28,10 +29,13 @@ const AREA_GROUP = { x1: 194, y1: 319, x2: 627, y2: 371 };
 const AREA_LEFTANSWERS = { x1: 61, y1: 708, x2: 701, y2: 1931 };
 const AREA_RIGHTANSWERS = { x1: 764, y1: 708, x2: 1374, y2: 1931 };
 const AREA_CENTERANSWERS = { x1: 14, y1: 708, x2: 1374, y2: 1931 };
+const AREA_BIGCENTERANSWERS = { x1: 14, y1: 200, x2: 1374, y2: 1931 };
 const IMG_NOMA = { x1: 959, y1: 155, x2: 1273, y2: 223 };
 const IMG_NAME = { x1: 14, y1: 117, x2: 724, y2: 290 };
 const BOX_MAX = 40; // each box is roughly 30 pixels wide/height
 const BOX_MIN = 20;
+const QR1 = { x: 728, y: 97 };
+const QRS = { x: 1201, y: 3 };
 
 
 const colors = {
@@ -262,7 +266,7 @@ const utils = (() => {
         return target.warpPerspective(matrix, new Size(image.sizes[1], image.sizes[0]));
     }
 
-    function imageDenoised(image, level=1.0) {
+    function imageDenoised(image, level = 1.0) {
         return image.gaussianBlur(new Size(5, 5), level);
     }
 
@@ -302,6 +306,26 @@ const utils = (() => {
 
 const templater = (() => {
 
+    function readQR(warped, x, y, inv = true) {
+        rect = new cv.Rect(x, y, 935 - 728, 295 - 97);
+        region = warped.getRegion(rect);
+        if (inv) {
+            region = region.threshold(0, 255, cv.THRESH_BINARY_INV);
+        } else {
+            region = region.threshold(196, 255, cv.THRESH_BINARY);
+        }
+        let data = region.getData();
+        let rgbadata = new Uint8ClampedArray(data.length * 4);
+        for (let i = 0; i < data.length; i++) {
+            let j = i * 4;
+            rgbadata[j] = data[i];
+            rgbadata[j + 1] = data[i];
+            rgbadata[j + 2] = data[i];
+            rgbadata[j + 3] = 255;
+        }
+        return jsQR(rgbadata, region.sizes[1], region.sizes[0], { inversionAttempts: 'dontInvert' });
+    }
+
     function typeOfTemplate(warped) {
         let rect = new cv.Rect(1225, 1941, 1370 - 1225, 1970 - 1941);
         let region = warped.getRegion(rect);
@@ -311,7 +335,18 @@ const templater = (() => {
         contours = mask.findContours(cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
         if (contours.length < 5) {
             if (region.countNonZero() < rect.width * rect.height * 0.5) {
-                return "custom"; // this is a rmixed template created from a Word document
+                // check for QR code presence
+                let qr = readQR(warped, QR1.x, QR1.y);
+                if (qr === null) {
+                    qr = readQR(warped, QRS.x, QRS.y);
+                    if (qr === null) {
+                        return "custom";
+                    } else {
+                        return "customqr*";
+                    }
+                } else {
+                    return "customqr";
+                }
             } else {
                 return "grid"; // this is a response grid created by easyOMR
             }
@@ -440,11 +475,20 @@ const templater = (() => {
                 } else {
                     continue;
                 }
-            } else if (utils.isInRect(r.x, r.y, AREA_CENTERANSWERS)) {
-                adder = left;
-            } else {
-                continue;
-            }
+            } else if (nucolumns == 1) {
+                if (utils.isInRect(r.x, r.y, AREA_CENTERANSWERS)) {
+                    adder = left;
+                } else {
+                    continue;
+                }
+            } else if (nucolumns == 0) {
+                if (utils.isInRect(r.x, r.y, AREA_BIGCENTERANSWERS)) {
+                    adder = left;
+                } else {
+                    continue;
+                }
+            } else continue;
+
             let ar = r.width / r.height;
 
             if (r.width > BOX_MIN && r.height > BOX_MIN && r.width < BOX_MAX && r.height < BOX_MAX && ar > 0.7 && ar < 1.3) {
@@ -613,7 +657,7 @@ const templater = (() => {
     }
 
     return {
-        typeOfTemplate, grabName, grabNoma, getNoma, getQuestions, getGroup, getTemplate, getImageTemplate, processTemplate, hasTemplate, readTemplate, readTemplateImages, IMG_NAME, IMG_NOMA, REFSIZE
+        typeOfTemplate, grabName, grabNoma, getNoma, getQuestions, getGroup, getTemplate, getImageTemplate, processTemplate, hasTemplate, readTemplate, readTemplateImages, IMG_NAME, IMG_NOMA, REFSIZE, readQR
     }
 })();
 
@@ -819,7 +863,7 @@ const checker = (() => {
             } else if (no1 && no2) {
                 r = false;
             } else if (yes1 || yes2) { // surely a tick or surely not an untick
-//                cv.imwrite(`maybe_${yes1}_${res[i*2+1]}_${yes2}_${res[i*2]}.jpg`,images[i]);
+                //                cv.imwrite(`maybe_${yes1}_${res[i*2+1]}_${yes2}_${res[i*2]}.jpg`,images[i]);
                 r = "maybe";
             } else if (no1 || no2) {
                 r = false;
@@ -955,7 +999,7 @@ const checker = (() => {
                     let rect = new cv.Rect(ox, oy, 40, 40); // take more space, gives a better chance to checkBox to find the actual box
                     let img = image.getRegion(rect).copy();
                     let hash = require('crypto').createHash('md5').update(img.getData()).digest("hex");
-                    cv.imwrite(fspath.join("tensorflow","train",state, hash+".jpg"), img);
+                    cv.imwrite(fspath.join("tensorflow", "train", state, hash + ".jpg"), img);
                 }
             }
             if (failed[line]) {
@@ -981,7 +1025,7 @@ const checker = (() => {
         return { answers, failed, errors };
     }
 
-    const getAnswers=(CREATETRAINDATA||OPENCV)?getAnswers_opencv:getAnswers_tensorflow
+    const getAnswers = (CREATETRAINDATA || OPENCV) ? getAnswers_opencv : getAnswers_tensorflow
 
     function getResult(image, template, dx, dy) {
         // process according to this single template
@@ -989,7 +1033,7 @@ const checker = (() => {
         let answers = getAnswers(image, template.questions, dx, dy);
         let group;
         if ("thisgroup" in template) {
-            group=template.thisgroup;
+            group = template.thisgroup;
         } else {
             group = getAnswers(image, template.group, dx, dy).answers[0];
         }
@@ -1574,9 +1618,9 @@ const pdf = (() => {
         } else {
             pdfDoc = await PDFDocument.create();
         }
-        const page = pdfDoc.addPage([210, 297]);
+        const page = pdfDoc.addPage([210 * 2.54, 297 * 2.54]);
         const jpgImage = await pdfDoc.embedJpg(cv.imencode(".jpg", image, [cv.IMWRITE_JPEG_QUALITY, 25]));
-        page.drawImage(jpgImage, { x: 0, y: 0, width: 210, height: 297 });
+        page.drawImage(jpgImage, { x: 0, y: 0, width: 210 * 2.54, height: 297 * 2.54 });
         const pdfBytes = await pdfDoc.save();
         fs.writeFileSync(path, pdfBytes);
     }
@@ -1589,12 +1633,12 @@ const pdf = (() => {
     }
 })();
 
-let normalizeOptions={
-    denoise:1.0,
-    edged:true
+let normalizeOptions = {
+    denoise: 1.0,
+    edged: true
 }
 
-function getNormalizedImage({path, image, template, corners, strings}) {
+function getNormalizedImage({ path, image, template, corners, strings }) {
     let ret = {
         width: image.sizes[1],
         height: image.sizes[0],
@@ -1606,9 +1650,9 @@ function getNormalizedImage({path, image, template, corners, strings}) {
     };
     let denoised, edged, group, warped;
     let _denoise, _edged;
-    for(let attempt=0; attempt<4; attempt++) {
-        _denoise=((attempt<2)?normalizeOptions.denoise:(normalizeOptions.denoise==1.0?0.5:1.0));
-        _edged=((attempt%2==0)?normalizeOptions.edged:!normalizeOptions.edged);
+    for (let attempt = 0; attempt < 4; attempt++) {
+        _denoise = ((attempt < 2) ? normalizeOptions.denoise : (normalizeOptions.denoise == 1.0 ? 0.5 : 1.0));
+        _edged = ((attempt % 2 == 0) ? normalizeOptions.edged : !normalizeOptions.edged);
         denoised = utils.imageDenoised(image, _denoise);
         edged = utils.imageThreshold(denoised, _edged);
         if (corners == null) {
@@ -1616,15 +1660,15 @@ function getNormalizedImage({path, image, template, corners, strings}) {
         } else {
             ret.corners = corners;
         }
-        let {br,bl,tr,tl}=ret.corners;
+        let { br, bl, tr, tl } = ret.corners;
         if ((br.x - tl.x) * (br.y - tl.y) / (ret.width * ret.height) < 0.5
-        || (Math.abs(tl.x-bl.x)/ret.width>0.1) || (Math.abs(tr.x-br.x)/ret.width>0.1) || (Math.abs(tl.y-tr.y)/ret.height>0.1) || (Math.abs(bl.y-br.y)/ret.height>0.1) 
+            || (Math.abs(tl.x - bl.x) / ret.width > 0.1) || (Math.abs(tr.x - br.x) / ret.width > 0.1) || (Math.abs(tl.y - tr.y) / ret.height > 0.1) || (Math.abs(bl.y - br.y) / ret.height > 0.1)
         ) {
             // corners seem wacky, try again with more sensitivity
             continue;
         } else {
             warped = utils.cropNormalizedCorners(ret.corners, edged);
-            if (template[0].type == "custom") { // no group management for custom templates, just assume group "a"
+            if (template[0].type.startsWith("custom")) { // no group management for custom templates, just assume group "a"
                 group = {
                     x: AREA_GROUP.x1,
                     y: AREA_GROUP.y1,
@@ -1638,8 +1682,8 @@ function getNormalizedImage({path, image, template, corners, strings}) {
         }
     }
     // next time start with current config
-    normalizeOptions.denoise=_denoise;
-    normalizeOptions.edged=_edged;
+    normalizeOptions.denoise = _denoise;
+    normalizeOptions.edged = _edged;
     ret.pageid = utils.findPageIdArea(warped, AREA_GROUP.x1 - group.x, AREA_GROUP.y1 - group.y);
     ret.filename = fspath.basename(path);
 
@@ -1718,7 +1762,7 @@ async function readFile(path) {
     return image;
 }
 
-async function computeDrift({template, projectpath, warped, group, ret, pageidcache}) {
+async function computeDrift({ template, projectpath, warped, group, ret, pageidcache }) {
     let dx = 0;
     let dy = 0;
 
@@ -1748,7 +1792,7 @@ async function computeDrift({template, projectpath, warped, group, ret, pageidca
     let best = -1;
     for (let j = 0; j < scores.length; j++) {
         let righttemplate = scores[j].template;
-        if (righttemplate.type !== "custom") { // no group for custom templates => no group position shift
+        if (!righttemplate.type.startsWith("custom")) { // no group for custom templates => no group position shift
             dx = righttemplate.group[0][0].x - group.x;
             dy = righttemplate.group[0][0].y - group.y;
         }
@@ -1772,15 +1816,15 @@ async function computeDrift({template, projectpath, warped, group, ret, pageidca
         }
     }
     let righttemplate = scores[best].template;
-    if (righttemplate.type !== "custom") { // no group for custom templates => no group position shift
+    if (!righttemplate.type.startsWith("custom")) { // no group for custom templates => no group position shift
         dx = righttemplate.group[0][0].x - group.x;
         dy = righttemplate.group[0][0].y - group.y;
     }
 
-    if (dy<-2) dy=-2;
-    if (dy>2) dy=2;
-    if (dx<-2) dx=-2;
-    if (dx>2) dx=2;
+    if (dy < -2) dy = -2;
+    if (dy > 2) dy = 2;
+    if (dx < -2) dx = -2;
+    if (dx > 2) dx = 2;
 
     ret.answers = answers[best].answers;
     ret.noma = checker.getNoma(warped, righttemplate.noma, -dx, -dy);
@@ -1793,5 +1837,5 @@ async function computeDrift({template, projectpath, warped, group, ret, pageidca
 }
 
 module.exports = {
-    getNormalizedImage, computeDrift, templater, checker, utils, REFSIZE, colors, project, pdf, debug(d) { DEBUG = d; }, AREA_GROUP
+    getNormalizedImage, computeDrift, templater, checker, utils, REFSIZE, colors, project, pdf, debug(d) { DEBUG = d; }, AREA_GROUP, QR1, QRS
 }
