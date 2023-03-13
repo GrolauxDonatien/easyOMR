@@ -588,7 +588,7 @@ let actions = {
         const Point2 = omr.utils.cv.Point2;
         const Size = omr.utils.cv.Size;
         const Rect = omr.utils.cv.Rect;
-        let copies = fspath.join(path, "template", "copies");
+        let copies = fspath.join(path, "copies");
         if (!fs.existsSync(copies)) fs.mkdirSync(copies);
         let tpls = [];
         let pdfs = {};
@@ -690,7 +690,7 @@ let actions = {
                 });
                 let buf = await stream2buffer(stream);
                 let qrcode = cv.imdecode(buf);
-                let c = templates[i].corners;
+                let c = templates[t].corners;
 
                 if ("pdf" in tpls[t]) {
                     let pdfDoc;

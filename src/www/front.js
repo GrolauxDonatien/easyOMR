@@ -32,6 +32,8 @@ function equalsFilename(fn1, fn2) {
 const project = (() => {
     let current = {};
     let forceRefresh;
+    let suspend;
+    let resume;
 
     function runTemplateView(forceRescan) {
         let path = joinPath(current.path, "template");
@@ -128,6 +130,26 @@ const project = (() => {
         v.onListSelect(select);
         let updLock = false;
         let updFuture;
+        function resume() {
+            if (updLock) {
+                updLock=false;
+                if (updFuture !== null) {
+                    let t=updFuture;
+                    updFuture=null;
+                    update(t);
+                } else {
+                    if (v.select() != null) {
+                        select(v.select());
+                    } else {
+                        v.select(0); // force select first item
+                        if (v.select() != null) {
+                            select(v.select());
+                        }
+                    }
+                    setNav();
+                }
+            }
+        }
         function update(files) {
             if (updLock) {
                 updFuture = files;
@@ -164,21 +186,8 @@ const project = (() => {
                         v.redraw();
                         nav.select("template"); // refresh UI
                     }
-                    updLock = false;
                     lock.destroy();
-                    if (updFuture !== null) {
-                        update(updFuture);
-                    } else {
-                        if (v.select() != null) {
-                            select(v.select());
-                        } else {
-                            v.select(0); // force select first item
-                            if (v.select() != null) {
-                                select(v.select());
-                            }
-                        }
-                        setNav();
-                    }
+                    resume();
                     return;
                 }
                 if (formatFilename(files[idx]).toLowerCase().endsWith('.xlsx')) {
@@ -509,7 +518,11 @@ const project = (() => {
                 update(files);
             }, customTemplateEditor, redraw() {
                 v.redraw();
-            }
+            }, suspend() {
+                if (!updLock) {
+                    updLock=true;
+                }
+            }, resume
         }
     }
 
@@ -1396,6 +1409,8 @@ const project = (() => {
                 forceRefresh = tplView.forceRefresh;
                 customTemplateEditor = tplView.customTemplateEditor;
                 redrawTemplate = tplView.redraw;
+                suspend = tplView.suspend;
+                resume = tplView.resume;
             }
         }, (e) => {
             alert(e.responseText);
@@ -1766,11 +1781,13 @@ const project = (() => {
         },
         createCopies(n) {
             let lock = lockDisplay(exportStrings.running);
-            lock.length(n);
+            lock.length(n);            
             // loop through setTimeouts so that the browser has a chance to refresh the display
+            suspend();
             function loop(i) {
                 if (!(i < n)) {
                     lock.destroy();
+                    resume();
                     return;
                 }
                 lock.progress(i);
