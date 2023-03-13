@@ -14,6 +14,7 @@ const IMAGETYPES = ["bmp", "pbm", "pgm", "ppm", "sr", "ras", "jpeg", "jpg", "jpe
 const uuidv4 = require('uuid').v4;
 const QRCode = require("qrcode");
 const MemoryStream = require('memorystream');
+const { PDFDocument, StandardFonts, rgb, PDFImage } = require("pdf-lib");
 
 
 const AsyncFunction = (async () => { }).constructor;
@@ -49,7 +50,7 @@ async function readFile(path) {
         let sp = path.split("@");
         if (sp.length == 2 && isPDF(sp[0]) && sp[1] == "" + parseInt(sp[1])) {
             let buffer = await omr.pdf.exportPNG(sp[0], parseInt(sp[1]));
-            image = cv.imdecode(buffer);
+            image = cv.imdecode(buffer, cv.IMREAD_UNCHANGED);
         } else {
             throw new Error("Invalid file " + path);
         }
@@ -589,15 +590,29 @@ let actions = {
         const Rect = omr.utils.cv.Rect;
         let copies = fspath.join(path, "template", "copies");
         if (!fs.existsSync(copies)) fs.mkdirSync(copies);
-        let tplimages = [];
-        let qrcoords = [];
+        let tpls = [];
+        let pdfs = {};
         for (let i = 0; i < templates.length; i++) {
+            tpls[i] = {};
             let template = templates[i];
-            let tplimage = await readFile(fspath.join(path, "template", formatFilename(template.filename)));
+            let fn = formatFilename(template.filename);
+            let tplimage = await readFile(fspath.join(path, "template", fn));
+            let sp = fn.split("@");
+            if (sp.length == 2 && sp[0].toLowerCase().endsWith(".pdf") && sp[1] == "" + parseInt(sp[1])) {
+                if (!(sp[0] in pdfs)) {
+                    try {
+                        pdfs[sp[0]] = await PDFDocument.load(fs.readFileSync(fspath.join(path, "template", sp[0])));
+                    } finally { }
+                }
+                if (sp[0] in pdfs) {
+                    tpls[i].pdf = pdfs[sp[0]];
+                    tpls[i].page = parseInt(sp[1]) - 1;
+                }
+            }
             try {
                 tplimage = tplimage.bgrToGray();
             } catch (_) { };
-            tplimages.push(tplimage);
+            tpls[i].image = tplimage;
             const corners = template.corners;
             let width = Math.floor(omr.REFSIZE / 1.4142);
             let height = omr.REFSIZE;
@@ -629,20 +644,19 @@ let actions = {
                 let result = src.perspectiveTransform(matrix).getDataAsArray();
                 return new Point2(result[0][0][0], result[0][0][1]);
             }
-            qrcoords.push({
+            tpls[i].qrcoords = {
                 tl: warpCoordinates(qr.location.topLeftCorner.x + ox, qr.location.topLeftCorner.y + oy, imatrix),
                 tr: warpCoordinates(qr.location.topRightCorner.x + ox, qr.location.topRightCorner.y + oy, imatrix),
                 bl: warpCoordinates(qr.location.bottomLeftCorner.x + ox, qr.location.bottomLeftCorner.y + oy, imatrix),
                 br: warpCoordinates(qr.location.bottomRightCorner.x + ox, qr.location.bottomRightCorner.y + oy, imatrix),
-            })
+            }
         }
         const font = omr.utils.cv.FONT_HERSHEY_PLAIN;
         for (let i = 0; i < count; i++) {
             let id = uuidv4();
             let exportpath = fspath.join(copies, id + ".pdf");
-            for (let t = 0; t < tplimages.length; t++) {
-                let img = tplimages[t];
-                let coords = qrcoords[t];
+            for (let t = 0; t < tpls.length; t++) {
+                let coords = tpls[t].qrcoords;
                 let x1 = Math.min(coords.tl.x, coords.bl.x);
                 let x2 = Math.max(coords.tr.x, coords.br.x);
                 let y1 = Math.min(coords.tl.y, coords.tr.y);
@@ -651,16 +665,6 @@ let actions = {
                 let p2 = new Point2(x2 + 5, y1 - 5);
                 let p3 = new Point2(x2 + 5, y2 + 5);
                 let p4 = new Point2(x1 - 5, y2 + 5);
-
-                img.drawFillPoly([[p1, p2, p3, p4]], omr.colors.WHITE);
-                let c = templates[i].corners;
-                let tc;
-                if (t == 0) {
-                    tc = new Point2(c.tl.x + (c.tr.x - c.tl.x) / 100 * 3, c.tl.y + (c.bl.y - c.tl.y) / 100 * 17);
-                } else {
-                    tc = new Point2(c.tl.x + (c.tr.x - c.tl.x) / 100 * 3, c.tl.y + (c.bl.y - c.tl.y) / 100 * 7);
-                }
-                img.putText("ref:" + id, tc, font, 1, omr.colors.BLACK, 2);
 
                 // create qrcode & insert into img
                 let stream = new MemoryStream();
@@ -678,15 +682,81 @@ let actions = {
                     });
                 }
 
-                await QRCode.toFileStream(stream, id+"/"+(t+1), { type:'png',
-                width:Math.min(x2-x1, y2-y1), 
-                margin:0,
-                errorCorrectionLevel:'H'});
-                let buf=await stream2buffer(stream);
-                let qrcode=cv.imdecode(buf);
-                qrcode.bgrToGray().copyTo(img.getRegion(new Rect(x1,y1,qrcode.sizes[1],qrcode.sizes[0])))
+                await QRCode.toFileStream(stream, id + "/" + (t + 1), {
+                    type: 'png',
+                    width: Math.min(x2 - x1, y2 - y1),
+                    margin: 0,
+                    errorCorrectionLevel: 'H'
+                });
+                let buf = await stream2buffer(stream);
+                let qrcode = cv.imdecode(buf);
+                let c = templates[i].corners;
 
-                await omr.pdf.writePDF(exportpath, img);
+                if ("pdf" in tpls[t]) {
+                    let pdfDoc;
+                    if (fs.existsSync(exportpath)) {
+                        pdfDoc = await PDFDocument.load(fs.readFileSync(exportpath));
+                    } else {
+                        pdfDoc = await PDFDocument.create();
+                    }
+                    let [page] = await pdfDoc.copyPages(tpls[t].pdf, [tpls[t].page]);
+                    pdfDoc.addPage(page);
+
+                    const jpgImage = await pdfDoc.embedJpg(cv.imencode(".jpg", qrcode, [cv.IMWRITE_JPEG_QUALITY, 100]));
+                    let coords = {
+                        x: x1 * page.getWidth() / tpls[t].image.sizes[1],
+                        y: page.getHeight() - qrcode.sizes[0] * page.getHeight() / tpls[t].image.sizes[0] - y1 * page.getHeight() / tpls[t].image.sizes[0],
+                        width: qrcode.sizes[1] * page.getWidth() / tpls[t].image.sizes[1],
+                        height: qrcode.sizes[0] * page.getHeight() / tpls[t].image.sizes[0]
+                    };
+
+                    page.drawRectangle({
+                        x: coords.x,
+                        y: coords.y,
+                        width: coords.width,
+                        height: coords.height,
+                        color: rgb(1, 1, 1),
+                        borderColor: rgb(1, 1, 1),
+                        borderWidth: page.getWidth() / 200
+                    });
+
+                    page.drawImage(jpgImage, coords);
+
+                    let px = c.tl.x + (c.tr.x - c.tl.x) / 100 * 3;
+                    px = px * page.getWidth() / tpls[t].image.sizes[1];
+
+                    if (t == 0) {
+                        let py = c.tl.y + (c.bl.y - c.tl.y) / 100 * 17;
+                        py = page.getHeight() - py * page.getHeight() / tpls[t].image.sizes[0];
+                        page.moveTo(px, py);
+                    } else {
+                        let py = c.tl.y + (c.bl.y - c.tl.y) / 100 * 7;
+                        py = page.getHeight() - py * page.getHeight() / tpls[t].image.sizes[0] - page.getWidth() / 80;
+                        page.moveTo(px, py);
+                    }
+
+                    page.drawText("ref:" + id, { size: page.getWidth() / 80 });
+
+                    const pdfBytes = await pdfDoc.save();
+                    fs.writeFileSync(exportpath, pdfBytes);
+
+                } else {
+                    let img = tpls[t].image;
+
+                    img.drawFillPoly([[p1, p2, p3, p4]], omr.colors.WHITE);
+                    let tc;
+                    if (t == 0) {
+                        tc = new Point2(c.tl.x + (c.tr.x - c.tl.x) / 100 * 3, c.tl.y + (c.bl.y - c.tl.y) / 100 * 17);
+                    } else {
+                        tc = new Point2(c.tl.x + (c.tr.x - c.tl.x) / 100 * 3, c.tl.y + (c.bl.y - c.tl.y) / 100 * 7);
+                    }
+                    img.putText("ref:" + id, tc, font, 1, omr.colors.BLACK, 2);
+
+                    qrcode.bgrToGray().copyTo(img.getRegion(new Rect(x1, y1, qrcode.sizes[1], qrcode.sizes[0])))
+
+                    await omr.pdf.writePDF(exportpath, img);
+                }
+
             }
         }
 

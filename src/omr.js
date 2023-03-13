@@ -1681,16 +1681,22 @@ function getNormalizedImage({ path, image, template, corners, strings }) {
             }
         }
     }
-    // next time start with current config
-    normalizeOptions.denoise = _denoise;
-    normalizeOptions.edged = _edged;
-    ret.pageid = utils.findPageIdArea(warped, AREA_GROUP.x1 - group.x, AREA_GROUP.y1 - group.y);
     ret.filename = fspath.basename(path);
-
-    if (group.group == null) {
-        ret.error = strings.groupError;
+    if (!warped) {
+        ret.error = strings.cornersError;
         ret.group = "99";
         ret.noma = "XXXXXX";
+    } else {
+        // next time start with current config
+        normalizeOptions.denoise = _denoise;
+        normalizeOptions.edged = _edged;
+        ret.pageid = utils.findPageIdArea(warped, AREA_GROUP.x1 - group.x, AREA_GROUP.y1 - group.y);
+
+        if (group.group == null) {
+            ret.error = strings.groupError;
+            ret.group = "99";
+            ret.noma = "XXXXXX";
+        }
     }
 
     return {
