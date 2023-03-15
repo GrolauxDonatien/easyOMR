@@ -132,10 +132,10 @@ const project = (() => {
         let updFuture;
         function resume() {
             if (updLock) {
-                updLock=false;
+                updLock = false;
                 if (updFuture !== null) {
-                    let t=updFuture;
-                    updFuture=null;
+                    let t = updFuture;
+                    updFuture = null;
                     update(t);
                 } else {
                     if (v.select() != null) {
@@ -520,7 +520,7 @@ const project = (() => {
                 v.redraw();
             }, suspend() {
                 if (!updLock) {
-                    updLock=true;
+                    updLock = true;
                 }
             }, resume
         }
@@ -638,22 +638,28 @@ const project = (() => {
                 v.redraw();
                 return;
             }
-            for (let i = 0; i < info.noma.length; i++) {
-                let p = tpl.noma[i][0];
-                let c = info.noma.charAt(i);
-                if (c == "_" || c == "X") continue;
-                v.drawText(c, p.x, p.y - 45, "green");
+            if (tpl.type != "customqr*") {
+                for (let i = 0; i < info.noma.length; i++) {
+                    let p = tpl.noma[i][0];
+                    let c = info.noma.charAt(i);
+                    if (c == "_" || c == "X") continue;
+                    v.drawText(c, p.x, p.y - 45, "green");
+                }
+            } else if (info.noma) {
+                v.drawText(info.noma, 600, 100, "green");
             }
-            for (let j = 0; j < info.noma.length; j++) {
-                switch (info.noma.charAt(j)) {
-                    case "_":
-                    case "X":
-                        v.drawCoords([tpl.noma[j]], "red");
-                        break;
-                    default:
-                        let c = info.noma.charCodeAt(j) - 48;
-                        let coords = [[tpl.noma[j][c]]];
-                        v.drawCoords(coords, "green");
+            if (tpl.type != "customqr*") {
+                for (let j = 0; j < info.noma.length; j++) {
+                    switch (info.noma.charAt(j)) {
+                        case "_":
+                        case "X":
+                            v.drawCoords([tpl.noma[j]], "red");
+                            break;
+                        default:
+                            let c = info.noma.charCodeAt(j) - 48;
+                            let coords = [[tpl.noma[j][c]]];
+                            v.drawCoords(coords, "green");
+                    }
                 }
             }
             if (current.users && (info.noma in current.users.users)) {
@@ -736,8 +742,7 @@ const project = (() => {
             // will not work as the auto detection was wrong anyway.
 
             // click in noma ?
-
-            for (let i = 0; i < tpl.noma.length; i++) {
+            if (tpl.noma) for (let i = 0; i < tpl.noma.length; i++) {
                 let n = coordsIndex(x, y, tpl.noma[i]);
                 if (n != -1) {
                     info.noma = info.noma.substring(0, i) + String.fromCharCode(n + 48) + info.noma.substring(i + 1);
@@ -1113,6 +1118,8 @@ const project = (() => {
                         if (!failed[k] || Object.keys(failed[k]).length == 0) delete failed[k];
                     }
                     current.scans[i].errors = errors;
+                    // link qr codes if needed
+                    linkQRCodes(current);
                     // save the udpated version
                     api("project-save", current);
                     // reset the left list
@@ -1146,6 +1153,25 @@ const project = (() => {
                 }
             }
             if (cb) cb();
+        }
+
+        function linkQRCodes(current) {
+            if (current.template[0].type != "customqr") return;
+            let links = {};
+            for (let i = 0; i < current.scans.length; i++) {
+                let s = current.scans[i];
+                if (s.qr.template == 0) {
+                    links[s.qr.code] = s.noma;
+                }
+            }
+            for (let i = 0; i < current.scans.length; i++) {
+                let s = current.scans[i];
+                if (s.qr.template != 0) {
+                    if (s.qr.code in links) {
+                        s.noma = links[s.qr.code];
+                    }
+                }
+            }
         }
 
         function update(files) {
@@ -1190,6 +1216,7 @@ const project = (() => {
                     let idx = 0;
                     function loop() {
                         if (idx >= needsScan.length) {
+                            linkQRCodes(current);
                             api("project-save", current);
                             lock.destroy();
                             show();
@@ -1312,7 +1339,7 @@ const project = (() => {
     }
 
     function toList(s, f, currentScan) {
-        list = {};
+        let list = {};
         // insert in list object
         let gcount = {};
         let pageMap = {};
@@ -1326,7 +1353,7 @@ const project = (() => {
             for (let noma in sub) {
                 for (let i = 0; i < sub[noma].length; i++) {
                     if (force || sub[noma][i].filename == currentScan?.filename) {
-                        let k = noma + "&nbsp;" + (pageMap[sub[noma][i].template] || "") + "&nbsp;" + suffix;
+                        let k = (noma == 'null' ? "?qr?" : noma) + "&nbsp;" + (pageMap[sub[noma][i].template] || "") + "&nbsp;" + suffix;
                         if (k in list) { // conflict, first one becomes xxx(1) and this one becomes yyy(2)
                             list[k + "(1)"] = list[k];
                             delete list[k];
@@ -1448,7 +1475,7 @@ const project = (() => {
             let scan = scans[i];
             if ("error" in scan) {
                 addScan(scan, errors);
-            } else if (scan.noma.indexOf("_") != -1 || scan.noma.indexOf("X") != -1) {
+            } else if (scan.noma && (scan.noma.indexOf("_") != -1 || scan.noma.indexOf("X") != -1)) {
                 addScan(scan, noma);
             } else if (groups.indexOf(scan.group) == -1) {
                 addScan(scan, pending);
@@ -1781,7 +1808,7 @@ const project = (() => {
         },
         createCopies(n) {
             let lock = lockDisplay(exportStrings.running);
-            lock.length(n);            
+            lock.length(n);
             // loop through setTimeouts so that the browser has a chance to refresh the display
             suspend();
             function loop(i) {

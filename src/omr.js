@@ -1674,6 +1674,39 @@ function getNormalizedImage({ path, image, template, corners, strings }) {
                     y: AREA_GROUP.y1,
                     group: "a"
                 }
+                if (template[0].type.startsWith("customqr")) {
+                    function formatqr(t) {
+                        let o=t.split("/");
+                        if (o.length==2) {
+                            let n=parseInt(o[1])-1;
+                            if (isNaN(n)) {
+                                return null;
+                            }
+                            return {
+                                code:o[0],
+                                template:n
+                            }
+                        }
+                    }
+                    // figure out qrcode, using image
+                    let iwarped = utils.cropNormalizedCorners(ret.corners, image);
+                    try {
+                        iwarped=iwarped.bgrToGray();
+                    } catch (_) {}
+                    // check for QR code presence
+                    let qr = templater.readQR(iwarped, QR1.x, QR1.y, false);
+                    if (qr === null) {
+                        qr = templater.readQR(iwarped, QRS.x, QRS.y, false);
+                        if (qr === null) {
+                            ret.qr=null;
+                        } else {
+                            ret.qr=formatqr(qr.data);
+                        }
+                    } else {
+                        ret.qr=formatqr(qr.data);
+                    }
+
+                }
                 break; // accept this has a success !
             } else {
                 group = checker.getGroup(warped);
@@ -1772,74 +1805,92 @@ async function computeDrift({ template, projectpath, warped, group, ret, pageidc
     let dx = 0;
     let dy = 0;
 
-    let scores = [];
-    let idx;
-    for (let i = 0; i < template.length; i++) {
-        idx = i;
-        if (group.group != template[i].thisgroup) continue; // wrong group
-        let pageid = utils.extractPageIdArea(warped, outer(ret.pageid, template[i].pageid));
-        let thisid = await getTemplatePageId(projectpath, template[i], pageidcache);
-        let score = utils.pagesSimilarity(pageid, thisid);
-        scores.push({
-            score, template: template[i], pageid, thisid
-        });
-    }
-    // we just take the template with the higher similarity
-    // first we score remaining templates
-    if (scores.length == 0) {
-        ret.error = strings.templateError + group.group;
-        ret.group = "99";
-        ret.noma = "XXXXXX";
-        return ret;
-    }
-    scores.sort((a, b) => b.score.maxVal - a.score.maxVal); // sort scores, higher first
-    let answers = [];
-    // attempt getting the answers, using best scoring template first
-    let best = -1;
-    for (let j = 0; j < scores.length; j++) {
-        let righttemplate = scores[j].template;
+    if ("qr" in ret) {// we already got the template page info from the QR code
+        let righttemplate=template[ret.qr.template];
+        let answer = checker.getAnswers(warped, righttemplate.questions, -dx, -dy);
+        ret.answers = answer.answers;
+        if (ret.qr.template==0) {
+            ret.noma = checker.getNoma(warped, righttemplate.noma, -dx, -dy);
+        } else {
+            ret.noma=null;
+        }
+        ret.group = group.group;
+        ret.failed = answer.failed;
+        ret.errors = answer.errors;
+        ret.template = righttemplate.filename;
+        ret.dx = dx;
+        ret.dy = dy;    
+    } else {
+        let scores = [];
+        let idx;
+        for (let i = 0; i < template.length; i++) {
+            idx = i;
+            if (group.group != template[i].thisgroup) continue; // wrong group
+            let pageid = utils.extractPageIdArea(warped, outer(ret.pageid, template[i].pageid));
+            let thisid = await getTemplatePageId(projectpath, template[i], pageidcache);
+            let score = utils.pagesSimilarity(pageid, thisid);
+            scores.push({
+                score, template: template[i], pageid, thisid
+            });
+        }
+        // we just take the template with the higher similarity
+        // first we score remaining templates
+        if (scores.length == 0) {
+            ret.error = strings.templateError + group.group;
+            ret.group = "99";
+            ret.noma = "XXXXXX";
+            return ret;
+        }
+        scores.sort((a, b) => b.score.maxVal - a.score.maxVal); // sort scores, higher first
+        let answers = [];
+        // attempt getting the answers, using best scoring template first
+        let best = -1;
+        for (let j = 0; j < scores.length; j++) {
+            let righttemplate = scores[j].template;
+            if (!righttemplate.type.startsWith("custom")) { // no group for custom templates => no group position shift
+                dx = righttemplate.group[0][0].x - group.x;
+                dy = righttemplate.group[0][0].y - group.y;
+            }
+            // shift warped dx and dy
+            let answer = checker.getAnswers(warped, righttemplate.questions, -dx, -dy);
+            answers.push(answer);
+            if (answer.errors < answer.answers.length * 0.1) { // low level of errors, just go for it
+                best = j;
+                break;
+            }
+        }
+        if (best == -1) {
+            best = 0;
+            let max = answers[0].errors / answers[0].answers.length;
+            for (let j = 1; j < scores.length; j++) {
+                let cmax = answers[j].errors / answers[j].answers.length;
+                if (cmax < max) {
+                    best = j;
+                    max = cmax;
+                }
+            }
+        }
+        let righttemplate = scores[best].template;
         if (!righttemplate.type.startsWith("custom")) { // no group for custom templates => no group position shift
             dx = righttemplate.group[0][0].x - group.x;
             dy = righttemplate.group[0][0].y - group.y;
         }
-        // shift warped dx and dy
-        let answer = checker.getAnswers(warped, righttemplate.questions, -dx, -dy);
-        answers.push(answer);
-        if (answer.errors < answer.answers.length * 0.1) { // low level of errors, just go for it
-            best = j;
-            break;
-        }
-    }
-    if (best == -1) {
-        best = 0;
-        let max = answers[0].errors / answers[0].answers.length;
-        for (let j = 1; j < scores.length; j++) {
-            let cmax = answers[j].errors / answers[j].answers.length;
-            if (cmax < max) {
-                best = j;
-                max = cmax;
-            }
-        }
-    }
-    let righttemplate = scores[best].template;
-    if (!righttemplate.type.startsWith("custom")) { // no group for custom templates => no group position shift
-        dx = righttemplate.group[0][0].x - group.x;
-        dy = righttemplate.group[0][0].y - group.y;
+    
+        if (dy < -2) dy = -2;
+        if (dy > 2) dy = 2;
+        if (dx < -2) dx = -2;
+        if (dx > 2) dx = 2;
+    
+        ret.answers = answers[best].answers;
+        ret.noma = checker.getNoma(warped, righttemplate.noma, -dx, -dy);
+        ret.group = group.group;
+        ret.failed = answers[best].failed;
+        ret.errors = answers[best].errors;
+        ret.template = righttemplate.filename;
+        ret.dx = dx;
+        ret.dy = dy;    
     }
 
-    if (dy < -2) dy = -2;
-    if (dy > 2) dy = 2;
-    if (dx < -2) dx = -2;
-    if (dx > 2) dx = 2;
-
-    ret.answers = answers[best].answers;
-    ret.noma = checker.getNoma(warped, righttemplate.noma, -dx, -dy);
-    ret.group = group.group;
-    ret.failed = answers[best].failed;
-    ret.errors = answers[best].errors;
-    ret.template = righttemplate.filename;
-    ret.dx = dx;
-    ret.dy = dy;
 }
 
 module.exports = {
