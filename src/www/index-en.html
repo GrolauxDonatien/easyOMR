@@ -7,7 +7,6 @@
 <body>
     <div class="panel" id="project">
         <div class="hint">Each project is defined by a folder on disk. This folder is organized with these sub-folders:
-            suivants :
             <ul>
                 <li>
                     <pre>template</pre> : drop template files here. Template files are the clean forms.
@@ -34,10 +33,10 @@
             3. A mixed document where both the questions and the checkboxes for the answers are present.<br>
             <br>
             For the first type, drop the pdf file created by Moodle into the template directory of this project.<br>
-            For the second and third types, click on the <pre>Edit...</pre> button to create to select the template type and start using it.<br>
-            This button only appears when the template directory is empty, and also for the second type of templates.<br>
+            For the second and third types, click on the <pre>Edit...</pre> button to select the template type and start using it.<br>
         </div>
         <div><label for="templateDirectory">Template directory: </label><button id="templateDirectory"></button>
+            <button id="template-create-copies" style="float:right">Create questionnaires...</button>
             <button id="template-edit-button" style="float:right">Edit...</button>
         </div>
         <div class="scanview" id="templateView">
@@ -92,7 +91,9 @@
             <input id="pages" type="checkbox" checked><label for="pages">Incomplete pages (<span>0</span>
                 &#x1F4D6;)</label>
             <div class="scanbuttons">
-                <button class="position" title="Repositionner">&#9714;</button>
+                <button class="position" title="Position">&#9714;</button>
+                &nbsp;&nbsp;&nbsp;
+                <button class="number" title="ID Number"><i>#</i></button>
                 &nbsp;&nbsp;&nbsp;
                 <select></select>
                 &nbsp;&nbsp;&nbsp;
@@ -169,6 +170,7 @@
         }
 
         const fileScanStrings = {
+            cornersError: "Unable to identify the edges",
             A4Error: "Incorrect image format",
             groupError: "Unable to accurately read the group",
             templateError: "No template for this group : "
@@ -203,10 +205,12 @@
             editTemplatePickAChoice: `What type of template do you want:
 1) Use a response grid create by the Offline Quizz tool of Moodle?
 2) Use a response grid managed by this tool, similar to type 1 but independent from Moodle?
-3) Use a document mixing questions and responses?`,
+3) Use a document mixing questions and responses?
+4) Similar to 3), but using a QR code to identify the pages so that students identify themselves on the first page only?`,
             editTemplateChoice1: "1) Moodle Grid",
             editTemplateChoice2: "2) easyOMR Grid",
             editTemplateChoice3: "3) Mixed document",
+            editTemplateChoice4: "3) Mixed document & QR Code",
             editTemplateMoodleTitle: "Moodle response grid template",
             editTemplateMoodle: `To use easyOMR with a response grid created by the Offline Quizz tool of Moodle,
 you just need to place the response grid pdf file created by Moodle into the template directory of this project.`,
@@ -216,7 +220,12 @@ If you continue, un basic Word document will be created inside this project temp
 Edit this document as needed, while respecting the constraints of formatting therein described.
 easyOMR cannot directly work with Word document, but it can work with pdf files:
 In Word, select File/Save As/Double-Click This Computer/Change Type to PDF (*.pdf), and
-save into the template directory of this project, replacing the pdf file present there.`
+save into the template directory of this project, replacing the pdf file present there.`,
+            createCopiesTitle: `Create questionnaires`,
+            createCopies: `Custom questionnaires with QR code cannot be printed directly from their template.
+        Indeed, each printed questionnaire uses a unique QR code which is used to group its pages together.
+        This option allows creating individual PDF questionnaires.
+        How many copies do you want: `
         }
 
         const errorStrings = {
@@ -227,6 +236,7 @@ save into the template directory of this project, replacing the pdf file present
             scan1: "Scan this page again, a replace the file to try again.",
             scan2: "You can also manually assign a group/page number.",
             missingImage: "Missing image file.",
+            mixedTemplates: "Warning: your templates mix different kinds and will not be able to work together correctly.",
             deleteZip: "There was an error while deleting existing zip files.",
             deleteImages: "There was an error while deleting existing jpg files.",
             createZip: "There was an error while creating zip files."

@@ -558,6 +558,7 @@ const project = (() => {
         document.querySelector(".scanbuttons select").addEventListener("focusout", changeTemplate);
 
         rebind(document.querySelector(".scanbuttons .position"), "click", position);
+        rebind(document.querySelector(".scanbuttons .number"), "click", matriculenumber);
 
         rebind(document.querySelector(".scanbuttons .bg"), "click", blueToGreen);
         rebind(document.querySelector(".scanbuttons .bo"), "click", blueToBlack);
@@ -1026,6 +1027,28 @@ const project = (() => {
                     resize();
                 };
                 image.src = "data:image/jpg;base64," + result.image;
+            });
+        }
+
+        function matriculenumber() {
+            if (!currentScan) return;
+            let info = currentScan;
+            let tpl = currentTemplate;
+            prompt({
+                label: exportStrings.noma,
+                value: info.noma.replaceAll('_','X'),
+                type: 'input'
+            }, (r) => {
+                if (r !== null) {
+                    // clear up r
+                    r=r.trim()+"XXXXXX";
+                    r=r.substring(0,6);
+                    for(let i=0; i<r.length; i++) {
+                        if (r[i]<"0" || r[i]>"9") r[i]="X";
+                    }
+                    info.noma = r;
+                    save();
+                }
             });
         }
 

@@ -6,8 +6,7 @@
 
 <body>
     <div class="panel" id="project">
-        <div class="hint">Chaque projet est défini par un répertoire. Ce répertoire contiendra les sous-répertoires
-            suivants :
+        <div class="hint">Chaque projet est défini par un répertoire. Ce répertoire contiendra les sous-répertoires suivants :
             <ul>
                 <li>
                     <pre>template</pre> : placez-y un document de réponse complètement vide.
@@ -19,8 +18,7 @@
                     <pre>export</pre> : une fois les scans traités, les options d'export créeront des fichiers ici.
                 </li>
             </ul>
-            <p>Ces répertoires seront créés automatiquement si nécessaire. Les formats de fichier supportés sont jpg et
-                pdf.</p>
+            <p>Ces répertoires seront créés automatiquement si nécessaire. Les formats de fichier supportés sont jpg et pdf.</p>
         </div>
         <div class="main">
             <button id="openProject">Ouvrir un projet...</button>
@@ -29,19 +27,13 @@
         <div id="projectInfo"></div>
     </div>
     <div class="panel" id="template">
-        <div class="hint">Un template définit quelles sont les cases à scanner dans les réponses. easyOMR supporte trois
-            types de templates:<br>
-            1. Les grilles de réponses des Quizz Offline de Moodle. Pour l'utiliser, déposez le fichier PDF généré par
-            Moodle directement dans le répertoire de template de ce projet.<br>
-            2. Des grilles de réponses gérées directement par easyOMR. Elles sont similaires mais indépendantes de
-            celles de Moodle. <br>
+        <div class="hint">Un template définit quelles sont les cases à scanner dans les réponses. easyOMR supporte trois types de templates:<br>
+            1. Les grilles de réponses des Quizz Offline de Moodle. Pour l'utiliser, déposez le fichier PDF généré par Moodle directement dans le répertoire de template de ce projet.<br>
+            2. Des grilles de réponses gérées directement par easyOMR. Elles sont similaires mais indépendantes de celles de Moodle. <br>
             3. Un document mixte mélangeant les questions et les cases à cocher pour les réponses. <br>
             <br>
-            Pour le type 1, téléchargez la grille de réponse au format PDF de Moodle, et déposez là dans le répertoire
-            template de ce projet.<br>
-            Pour les deux autres types, un bouton
-            <pre>Edition...</pre> apparaît ci-dessous quand le répertoire de template de ce projet est vide. Ce bouton
-            ouvre une boite de dialogue permettant de choisir le type souhaité.<br>
+            Pour le type 1, téléchargez la grille de réponse au format PDF de Moodle, et déposez là dans le répertoire template de ce projet.<br>
+            Pour les deux autres types, un bouton <pre>Edition...</pre> apparaît pour sélectionner le type de template et commencer à l'utiliser.<br>
         </div>
         <div><label for="templateDirectory">Répertoire de template: </label><button id="templateDirectory"></button>
             <button id="template-create-copies" style="float:right">Créer des copies...</button>
@@ -52,13 +44,9 @@
     </div>
     <div class="panel" id="edit-template">
         <div class="hint">
-            L'édition du template consiste à donner, pour chaque groupe, le nombre de réponses ainsi que le nombre de
-            choix pour chaque réponse.<br>
-            En sauvant ce template, vous générerez une nouvelle grille de réponses dans le répertoire template de votre
-            projet.<br>
-            Le bouton
-            <pre>Copier</pre> permet de créer de nouvelles lignes, tandis que le bouton
-            <pre>Effacer</pre> les supprime.
+            L'édition du template consiste à donner, pour chaque groupe, le nombre de réponses ainsi que le nombre de choix pour chaque réponse.<br>
+            En sauvant ce template, vous générerez une nouvelle grille de réponses dans le répertoire template de votre projet.<br>
+            Le bouton <pre>Copier</pre> permet de créer de nouvelles lignes, tandis que le bouton <pre>Effacer</pre> les supprime.
         </div>
         <div style="position:relative">
             <div class="templatebuttons">
@@ -69,16 +57,12 @@
         </div>
         <div class="editor"></div>
     </div>
-
     <div class="panel" id="edit-custom-template">
         <div class="hint">
             L'édition du template consiste à changer les groups qui forment une réponse.<br>
-            Cliquez sur les cases à cocher pour les sélectionner/désélectionner et sur le bouton
-            <pre>Grouper</pre> pour former un groupe.<br>
-            Lors de la formation d'un groupe, les cases orphelines sont aussi automatiquement réorganisées en
-            groupe.<br>
-            Les groupes sont automatiquement numérotés de haut en bas, et de gauche à droite quand ils sont sur la même
-            ligne.<br>
+            Cliquez sur les cases à cocher pour les sélectionner/désélectionner et sur le bouton <pre>Grouper</pre> pour former un groupe.<br>
+            Lors de la formation d'un groupe, les cases orphelines sont aussi automatiquement réorganisées en groupe.<br>
+            Les groupes sont automatiquement numérotés de haut en bas, et de gauche à droite quand ils sont sur la même ligne.<br>
         </div>
         <div style="position:relative">
             <div class="templatebuttons">
@@ -90,11 +74,9 @@
         <div class="positionview"></div>
     </div>
     <div class="panel" id="scans">
-        <div class="hint">Les réponses doivent être scannées, un fichier jpg par page page scannée, et placés dans le
-            répertoire ci-dessous.<br>
+        <div class="hint">Les réponses doivent être scannées, un fichier jpg par page page scannée, et les fichiers placés dans le répertoire ci-dessous.<br>
             Vous pouvez aussi utiliser une fichier PDF contenant plusieurs scans, un par page.<br>
-            CTRL+molette sur l'image permet de la zoomer. CTRL+S sauve la modification en cours et sélectionne le
-            prochain scan à corriger.
+            CTRL+molette sur l'image permet de la zoomer. CTRL+S sauve la modification en cours et sélectionne le prochain scan à corriger.
         </div>
         <div><label for="scansDirectory">Répertoire des scans: </label><button id="scansDirectory"></button>
             <span id="startscans">
@@ -110,6 +92,8 @@
                 &#x1F4D6;)</label>
             <div class="scanbuttons">
                 <button class="position" title="Repositionner">&#9714;</button>
+                &nbsp;&nbsp;&nbsp;
+                <button class="number" title="Matricule"><i>#</i></button>
                 &nbsp;&nbsp;&nbsp;
                 <select></select>
                 &nbsp;&nbsp;&nbsp;
@@ -144,20 +128,9 @@
     <div class="panel" id="export">
         <div class="hint">Vous pouvez exporter les résultats de plusieurs façons.<br>
             Les fichiers exportés sont tous créés dans le sous-répertoire export de votre projet.<br>
-            &bullet; L'
-            <pre>export images pour import Moodle</pre> (uniquement disponible pour les templates de type Moodle) génère
-            des images "propres" que vous pouvez ensuite importer
-            dans Moodle et qui ne devraient pas lui poser de problème de scanning.<br>
-            &bullet; L'
-            <pre>export du template au format Moodle XML</pre> génère un fichier générique de questions que vous
-            pouvez
-            importer dans une banque de question Moodle. Attention, ce fichier ne contient évidemment pas l'intitulé de
-            la question ni l'information
-            de correction, vous devrez la configurer dans Moodle vous-même.<br>
-            &bullet; Les autres exports génèrent des fichiers contenant les résultats bruts. Les exports Excel
-            contiennent aussi une structure de correction auto-générée :
-            il faut assigner des points pour chaque question à chaque réponse rencontrée dans les scans. Le système
-            génère alors une correction sommative pour chaque étudiant automatiquement.
+            &bullet; L'<pre>export images pour import Moodle</pre> (uniquement disponible pour les templates de type Moodle) génère des images "propres" que vous pouvez ensuite importer dans Moodle et qui ne devraient pas lui poser de problème de scanning.<br>
+            &bullet; L'<pre>export du template au format Moodle XML</pre> génère un fichier générique de questions que vous pouvez importer dans une banque de question Moodle. Attention, ce fichier ne contient évidemment pas l'intitulé de correction, vous devrez la configurer dans Moodle vous-même.<br>
+            &bullet; Les autres exports génèrent des fichiers contenant les résultats bruts. Les exports Excel contiennent aussi une structure de correction auto-générée : il faut assigner des points pour chaque question à chaque réponse rencontrée dans les scans. Le système génère alors une correction sommative pour chaque étudiant automatiquement.
         </div>
         <div><label for="exportDirectory">Répertoire d'export: </label><button id="exportDirectory"></button></div>
         <div class="exports">
@@ -174,8 +147,7 @@
             <button id="exportCorrect">Export Images Corrigées</button>
             <hr>
             <div class="hasErrors">
-                Attention: il reste des erreurs à corriger. L'export reste possible, mais les données exportées
-                seront incomplètes.
+                Attention: il reste des erreurs à corriger. L'export reste possible, mais les données exportées seront incomplètes.
             </div>
         </div>
     </div>

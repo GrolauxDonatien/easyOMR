@@ -26,6 +26,10 @@ function api(action, data, callback = () => { }, error = () => { }) {
     electron.ipcRenderer.send("ajax-message", { id: ajaxid, data, action });
 }
 
+function prompt(conf, callback = () => { }, error = () => { }) {
+    api("prompt",conf,callback,error);
+}
+
 api.push = function (action, data, callback = () => { }, error = () => { }) {
     ajaxid++;
     ajaxcallbacks[ajaxid] = { type: "push", success: callback, error: error };

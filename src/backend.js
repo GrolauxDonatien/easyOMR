@@ -15,7 +15,7 @@ const uuidv4 = require('uuid').v4;
 const QRCode = require("qrcode");
 const MemoryStream = require('memorystream');
 const { PDFDocument, StandardFonts, rgb, PDFImage } = require("pdf-lib");
-
+const prompt = require("electron-prompt");
 
 const AsyncFunction = (async () => { }).constructor;
 const ZIPCUTSIZE = 30 * 1024 * 1024; // when exporting clear scans for Moodle, zip files are cut after 25 MB is reached
@@ -984,6 +984,9 @@ let actions = {
         menuTemplate.submenu[2].label = newMenu["About..."];
         menuTemplate.submenu[3].label = newMenu.Exit;
         setMenu(menuTemplate);
+    },
+    "prompt":async function(conf) {
+        return await prompt(conf);
     }
 }
 function formatFilename(fn) {
