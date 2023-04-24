@@ -1035,6 +1035,7 @@ const project = (() => {
             let info = currentScan;
             let tpl = currentTemplate;
             prompt({
+                title: exportStrings.noma,
                 label: exportStrings.noma,
                 value: info.noma.replaceAll('_','X'),
                 type: 'input'

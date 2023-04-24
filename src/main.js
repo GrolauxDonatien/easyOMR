@@ -4,8 +4,8 @@ const electron = require('electron');
 const { app, BrowserWindow, dialog } = electron;
 const fs = require("fs");
 const fspath = require("path");
-const DEBUG = true;
-const VERSION = "1.0.44";
+const DEBUG = false;
+const VERSION = "1.0.46";
 const QR_code = "lkhglqksdlfd9876098HMLKJSDFH-1";
 
 

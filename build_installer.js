@@ -68,9 +68,7 @@ if (REPACKAGE) {
     }
     const APP_NODE_MODULES = path.resolve(APP_DIR, './resources/app');
     child_process.execSync("modclean -n default:safe -r -p " + APP_NODE_MODULES);
-    child_process.execSync("modclean -n default:caution -r -p " + APP_NODE_MODULES);
-
-
+//    child_process.execSync("modclean -n default:caution -r -p " + APP_NODE_MODULES);
     console.log("Opencv stuff is cleaned for smaller package");
 }
 
