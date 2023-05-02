@@ -819,7 +819,7 @@ let actions = {
 
         let lineWidth = Math.floor(3 * tplimage.sizes[0] / omr.REFSIZE); // width is proportional to actual image size, for REFSIZE, width is 6
         // tick noma boxes
-        for (let i = 0; i < scan.noma.length; i++) {
+        if (template.noma) for (let i = 0; i < scan.noma.length; i++) {
             let s = scan.noma.charCodeAt(i) - 48;
             let c = template.noma[i][s];
             if (c) {

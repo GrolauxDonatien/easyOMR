@@ -21,7 +21,7 @@
         {
             "type": "pwa-node",
             "request": "launch",
-            "name": "Launch MSI Builder",
+            "name": "MSI Builder",
             "skipFiles": [
                 "<node_internals>/**"
             ],
@@ -30,7 +30,7 @@
         {
             "type": "pwa-node",
             "request": "launch",
-            "name": "Launch Test",
+            "name": "Test",
             "skipFiles": [
                 "<node_internals>/**"
             ],
