@@ -484,6 +484,32 @@ const project = (() => {
                 redraw();
             })
 
+            rebind(document.querySelector("#edit-custom-template .delete"), "click", () => {
+                let newgroup = [];
+                for (let i = questions.length - 1; i >= 0; i--) {
+                    for (let j = questions[i].length - 1; j >= 0; j--) {
+                        let k = i + "x" + j;
+                        if (k in selected) { // delete
+                            questions[i].splice(j, 1);
+                        }
+                    }
+                    if (questions[i].length == 0) { // remove group now left empty
+                        questions.splice(i, 1);
+                    }
+                }
+                function sortBox(a, b) {
+                    if (a.y + a.h < b.y) return -1; // a completely above b
+                    if (b.y + b.h < a.y) return 1; // b completely above a
+                    return a.x - b.x; // on a similar horizontal line, sort by x position
+                }
+                // sort questions
+                questions.sort((la, lb) => {
+                    return sortBox(la[0], lb[0]); // sort is based on the first box of each question group
+                });
+                selected = {};
+                redraw();
+            })
+
             rebind(document.querySelector("#edit-custom-template .save"), "click", () => {
                 template.questions = questions;
                 forceRescan();
