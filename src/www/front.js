@@ -9,6 +9,8 @@
 *
 */
 
+const { cpSync } = require("original-fs");
+
 api("set-menu", menuStrings);
 
 function joinPath(path, extra) {
@@ -585,6 +587,7 @@ const project = (() => {
 
         rebind(document.querySelector(".scanbuttons .position"), "click", position);
         rebind(document.querySelector(".scanbuttons .number"), "click", matriculenumber);
+        rebind(document.querySelector(".scanbuttons .ignore"), "click", ignorescan);
 
         rebind(document.querySelector(".scanbuttons .bg"), "click", blueToGreen);
         rebind(document.querySelector(".scanbuttons .bo"), "click", blueToBlack);
@@ -759,6 +762,18 @@ const project = (() => {
             }
         }
 
+        let showinfota = null;
+        function showInfo(info) {
+            if (showinfota != null) {
+                clearInterval(showinfota);
+                showinfota = null;
+            }
+            document.getElementById("infomsg").innerText = info;
+            showinfota = setInterval(() => {
+                //                document.getElementById("infomsg").innerText="";
+            }, 1000);
+        }
+
         v.onClick((x, y, event) => {
             let info = currentScan;
             if ("error" in info) return; // buggy
@@ -784,6 +799,13 @@ const project = (() => {
                 let n = coordsIndex(x, y, tpl.questions[i]);
                 if (n != -1) {
                     let f = null;
+                    if ("read" in info) {
+                        if (info.read[i] && info.read[i][n]) {
+                            showInfo(info.read[i][n]);
+                        } else {
+                            showInfo('');
+                        }
+                    }
                     if (info.failed[i] && info.failed[i][n]) {
                         f = info.failed[i][n];
                         info.failed[i][n] = null; // remove fail marker
@@ -1060,23 +1082,35 @@ const project = (() => {
             if (!currentScan) return;
             let info = currentScan;
             let tpl = currentTemplate;
+            let noma = info.noma;
+            if (noma == null) noma = "XXXXXX";
             prompt({
                 title: exportStrings.noma,
                 label: exportStrings.noma,
-                value: info.noma.replaceAll('_','X'),
+                value: noma.replaceAll('_', 'X'),
                 type: 'input'
             }, (r) => {
                 if (r !== null) {
                     // clear up r
-                    r=r.trim()+"XXXXXX";
-                    r=r.substring(0,6);
-                    for(let i=0; i<r.length; i++) {
-                        if (r[i]<"0" || r[i]>"9") r[i]="X";
+                    r = r.trim() + "XXXXXX";
+                    r = r.substring(0, 6);
+                    for (let i = 0; i < r.length; i++) {
+                        if (r[i] < "0" || r[i] > "9") r[i] = "X";
                     }
                     info.noma = r;
                     save();
                 }
             });
+        }
+
+        function ignorescan() {
+            if (!currentScan) return;
+            let info = currentScan;
+            if (confirm(strings.confirm)) {
+                info.ignore = true;
+                save();
+            }
+
         }
 
         function blueToGreen() {
@@ -1210,13 +1244,13 @@ const project = (() => {
             let links = {};
             for (let i = 0; i < current.scans.length; i++) {
                 let s = current.scans[i];
-                if (s.qr.template == 0) {
+                if (s.qr && s.qr.template == 0) {
                     links[s.qr.code] = s.noma;
                 }
             }
             for (let i = 0; i < current.scans.length; i++) {
                 let s = current.scans[i];
-                if (s.qr.template != 0) {
+                if (s.qr && s.qr.template != 0) {
                     if (s.qr.code in links) {
                         s.noma = links[s.qr.code];
                     }
@@ -1244,7 +1278,7 @@ const project = (() => {
             let needsScan = [];
 
             for (let i = 0; i < files.length; i++) {
-                if (!(files[i] in l)) {
+                if (files[i].ignore !== false && !(files[i] in l)) {
                     needsScan.push(files[i]);
                 }
             }
@@ -1523,6 +1557,7 @@ const project = (() => {
 
         for (let i = 0; i < scans.length; i++) {
             let scan = scans[i];
+            if (scan.ignore === true) continue;
             if ("error" in scan) {
                 addScan(scan, errors);
             } else if (scan.noma && (scan.noma.indexOf("_") != -1 || scan.noma.indexOf("X") != -1)) {

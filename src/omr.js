@@ -11,6 +11,16 @@ const jsQR = require("jsqr");
 const CREATETRAINDATA = false;
 const OPENCV = true;
 
+const LO_OPENCVTHRESHOLD_NO = 0.02;
+const LO_OPENCVTHRESHOLD_LOWMAYBE = 0.08;
+const LO_OPENCVTHRESHOLD_YES = 0.75;
+const LO_OPENCVTHRESHOLD_HIGHMAYBE = 0.94;
+
+const HI_OPENCVTHRESHOLD_NO = 0.01;
+const HI_OPENCVTHRESHOLD_LOWMAYBE = 0.20;
+const HI_OPENCVTHRESHOLD_YES = 0.70;
+const HI_OPENCVTHRESHOLD_HIGHMAYBE = 0.94;
+
 let omrmodel;
 
 async function loadOMRModel() {
@@ -138,6 +148,7 @@ const utils = (() => {
         let width = image.sizes[1];
         let height = image.sizes[0];
         let { tl, tr, bl, br } = findContoursCorners(contours, width, height);
+        if (tl == null || tr == null || bl == null || br == null) return null;
         function getCoords(p) {
             p = p.boundingRect();
             return { x: p.x + p.width / 2 + SHRINKAGE, y: p.y + p.height / 2 + SHRINKAGE } // { x: p.x + p.width * dx, y: p.y + p.height * dy }
@@ -307,23 +318,31 @@ const utils = (() => {
 const templater = (() => {
 
     function readQR(warped, x, y, inv = true) {
-        rect = new cv.Rect(x, y, 935 - 728, 295 - 97);
-        region = warped.getRegion(rect);
-        if (inv) {
-            region = region.threshold(0, 255, cv.THRESH_BINARY_INV);
-        } else {
-            region = region.threshold(196, 255, cv.THRESH_BINARY);
+        let rect = new cv.Rect(x, y, 935 - 728, 295 - 97);
+        let region = warped.getRegion(rect);
+
+        function attemptRead(mat, invert) {
+            let data = mat.getData();
+            let rgbadata = new Uint8ClampedArray(data.length * 4);
+            for (let i = 0; i < data.length; i++) {
+                let j = i * 4;
+                rgbadata[j] = data[i];
+                rgbadata[j + 1] = data[i];
+                rgbadata[j + 2] = data[i];
+                rgbadata[j + 3] = 255;
+            }
+            return jsQR(rgbadata, region.sizes[1], region.sizes[0], { inversionAttempts: invert });
         }
-        let data = region.getData();
-        let rgbadata = new Uint8ClampedArray(data.length * 4);
-        for (let i = 0; i < data.length; i++) {
-            let j = i * 4;
-            rgbadata[j] = data[i];
-            rgbadata[j + 1] = data[i];
-            rgbadata[j + 2] = data[i];
-            rgbadata[j + 3] = 255;
+        let ret = attemptRead(region.gaussianBlur(new cv.Size(0, 0), 0.1), inv ? "invertFirst" : "attemptBoth");
+        if (ret == null) {
+            if (inv) {
+                region = region.threshold(0, 255, cv.THRESH_BINARY_INV);
+            } else {
+                region = region.threshold(196, 255, cv.THRESH_BINARY);
+            }
+            ret = attemptRead(region, 'attemptBoth');
         }
-        return jsQR(rgbadata, region.sizes[1], region.sizes[0], { inversionAttempts: 'dontInvert' });
+        return ret;
     }
 
     function typeOfTemplate(warped) {
@@ -762,42 +781,52 @@ const checker = (() => {
             // 2. a mostly full box weirdly captured.
             // 3. a silly student that decides that erasing the box is a good idea, and then ticking the box anyway
             // 
-            // we can make the distinction by counting the nonzeros;
+            // let's just be careful and return we don't know
             let t = warped.countNonZero() / (warped.sizes[1] * warped.sizes[0]);
-            if (t > 0.5) { // more than half is drawn => assume full box
-                if (DEBUG) cv.imwrite('autofull_' + (count++) + ".jpg", warped);
-                return false;
-            } else { // is it empty ?
-                if (t < 0.05) {
-                    if (DEBUG) cv.imwrite('empty_' + (count++) + ".jpg", warped);
-                    return "empty";
-                } else { // run checkDensity as usual
-                    return checkDensity(warped);
-                }
-            }
+            return { t, guess: "maybe" };
+            /*            if (t > 0.5) { // more than half is drawn => assume full box
+                            if (DEBUG) cv.imwrite('autofull_' + (count++) + ".jpg", warped);
+                            return false;
+                        } else { // is it empty ?
+                            if (t < HI_OPENCVTHRESHOLD_NO) {
+                                if (DEBUG) cv.imwrite('empty_' + (count++) + ".jpg", warped);
+                            } else { // run checkDensity as usual
+                                return checkDensity(warped);
+                            }
+                        }*/
         }
 
         let rect = new cv.Rect(left + 1, top + 1, right - left - 2, bottom - top - 2);
 
         return checkDensity(warped.getRegion(rect));
 
-        function checkDensity(warped) {
+        function checkDensity(warped, high = true) {
             let t = warped.countNonZero() / (warped.sizes[0] * warped.sizes[1]);
-            if (t < 0.02) {
+            function checkStable(proposal) {
+                return proposal;
+                // does not really work
+/*                let verticalStructure = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(1, warped.sizes[0] * 0.75));
+                mask = warped.erode(verticalStructure, new cv.Point(-1, -1));
+                let t2 = mask.countNonZero() / (mask.sizes[0] * mask.sizes[1]);
+                if (t2 / t > 1.2 || t / t2 > 1.2) {
+                    return { t, t2, guess: "maybe" };
+                } else return proposal;*/
+            }
+            if (t < (high ? HI_OPENCVTHRESHOLD_NO : LO_OPENCVTHRESHOLD_NO)) {
                 if (DEBUG) cv.imwrite('no_' + (count++) + ".jpg", warped);
-                return false;
-            } else if (t < 0.08) {
+                return checkStable({ t, guess: false });
+            } else if (t < (high ? HI_OPENCVTHRESHOLD_LOWMAYBE : LO_OPENCVTHRESHOLD_LOWMAYBE)) {
                 if (DEBUG) cv.imwrite('maybe_' + (count++) + ".jpg", warped);
-                return "maybe";
-            } else if (t < 0.75) {
+                return { t, guess: "maybe" };
+            } else if (t < (high ? HI_OPENCVTHRESHOLD_YES : LO_OPENCVTHRESHOLD_YES)) {
                 if (DEBUG) cv.imwrite('yes_' + (count++) + ".jpg", warped);
-                return true;
-            } else if (t < 0.88) {
+                return checkStable({ t, guess: true });
+            } else if (t < (high ? HI_OPENCVTHRESHOLD_HIGHMAYBE : LO_OPENCVTHRESHOLD_HIGHMAYBE)) {
                 if (DEBUG) cv.imwrite('maybefull_' + (count++) + ".jpg", warped);
-                return "maybe";
+                return { t, guess: "maybe" };
             } else {
                 if (DEBUG) cv.imwrite('nofull_' + (count++) + ".jpg", warped);
-                return false;
+                return { t, guess: false };
             }
         }
 
@@ -940,12 +969,12 @@ const checker = (() => {
         return { answers, failed, errors };
     }
 
-
     function getAnswers_opencv(image, coords, dx = 0, dy = 0) {
         // get questions in normalized image according to given coords
         let failed = [];
         let answers = [];
         let errors = 0;
+        let read = [];
         for (let line = 0; line < coords.length; line++) {
             let answer = [];
             for (let col = 0; col < coords[line].length; col++) {
@@ -962,7 +991,10 @@ const checker = (() => {
                 }
                 let rect = new cv.Rect(ox, oy, bb.w + 10, bb.h + 10); // take more space, gives a better chance to checkBox to find the actual box
                 let mask = image.getRegion(rect);
-                let state = checkBox(mask);
+                let readbox = checkBox(mask);
+                if (read[line] == undefined) read[line] = [];
+                read[line][col] = readbox.t;
+                let state = readbox.guess;
                 switch (state) {
                     case "empty": // empty means no box found at all, just ignore and consider not ticked
                         if (failed[line] == undefined) failed[line] = [];
@@ -1022,7 +1054,7 @@ const checker = (() => {
                 answers.push(answer.join("/"));
             }
         }
-        return { answers, failed, errors };
+        return { answers, failed, errors, read };
     }
 
     const getAnswers = (CREATETRAINDATA || OPENCV) ? getAnswers_opencv : getAnswers_tensorflow
@@ -1041,6 +1073,7 @@ const checker = (() => {
             noma: noma,
             answers: answers.answers,
             failed: answers.failed,
+            read: answers.read,
             group: group,
             errors: answers.errors + group.errors
         }
@@ -1642,6 +1675,7 @@ function getNormalizedImage({ path, image, template, corners, strings }) {
     let ret = {
         width: image.sizes[1],
         height: image.sizes[0],
+        filename: fspath.basename(path)
     }
     if (!utils.isImageA4(image)) {
         ret.error = strings.A4Error;
@@ -1660,6 +1694,9 @@ function getNormalizedImage({ path, image, template, corners, strings }) {
         } else {
             ret.corners = corners;
         }
+        if (ret.corners == null) {
+            continue;
+        }
         let { br, bl, tr, tl } = ret.corners;
         if ((br.x - tl.x) * (br.y - tl.y) / (ret.width * ret.height) < 0.5
             || (Math.abs(tl.x - bl.x) / ret.width > 0.1) || (Math.abs(tr.x - br.x) / ret.width > 0.1) || (Math.abs(tl.y - tr.y) / ret.height > 0.1) || (Math.abs(bl.y - br.y) / ret.height > 0.1)
@@ -1676,34 +1713,34 @@ function getNormalizedImage({ path, image, template, corners, strings }) {
                 }
                 if (template[0].type.startsWith("customqr")) {
                     function formatqr(t) {
-                        let o=t.split("/");
-                        if (o.length==2) {
-                            let n=parseInt(o[1])-1;
+                        let o = t.split("/");
+                        if (o.length == 2) {
+                            let n = parseInt(o[1]) - 1;
                             if (isNaN(n)) {
                                 return null;
                             }
                             return {
-                                code:o[0],
-                                template:n
+                                code: o[0],
+                                template: n
                             }
                         }
                     }
                     // figure out qrcode, using image
                     let iwarped = utils.cropNormalizedCorners(ret.corners, image);
                     try {
-                        iwarped=iwarped.bgrToGray();
-                    } catch (_) {}
+                        iwarped = iwarped.bgrToGray();
+                    } catch (_) { }
                     // check for QR code presence
                     let qr = templater.readQR(iwarped, QR1.x, QR1.y, false);
                     if (qr === null) {
                         qr = templater.readQR(iwarped, QRS.x, QRS.y, false);
                         if (qr === null) {
-                            ret.qr=null;
+                            ret.qr = null;
                         } else {
-                            ret.qr=formatqr(qr.data);
+                            ret.qr = formatqr(qr.data);
                         }
                     } else {
-                        ret.qr=formatqr(qr.data);
+                        ret.qr = formatqr(qr.data);
                     }
 
                 }
@@ -1714,11 +1751,11 @@ function getNormalizedImage({ path, image, template, corners, strings }) {
             }
         }
     }
-    ret.filename = fspath.basename(path);
     if (!warped) {
         ret.error = strings.cornersError;
         ret.group = "99";
         ret.noma = "XXXXXX";
+        warped = image;
     } else {
         // next time start with current config
         normalizeOptions.denoise = _denoise;
@@ -1801,25 +1838,34 @@ async function readFile(path) {
     return image;
 }
 
-async function computeDrift({ template, projectpath, warped, group, ret, pageidcache }) {
+async function computeDrift({ template, projectpath, warped, group, ret, pageidcache, strings }) {
     let dx = 0;
     let dy = 0;
 
     if ("qr" in ret) {// we already got the template page info from the QR code
-        let righttemplate=template[ret.qr.template];
-        let answer = checker.getAnswers(warped, righttemplate.questions, -dx, -dy);
-        ret.answers = answer.answers;
-        if (ret.qr.template==0) {
-            ret.noma = checker.getNoma(warped, righttemplate.noma, -dx, -dy);
+        // if ret.qr.template is null, then we are fucked ?
+        if (ret.qr == null || ret.qr.template == null) {
+            ret.error = strings.templateError;
+            ret.group = "99";
+            ret.noma = "XXXXXX";
+            return ret;
         } else {
-            ret.noma=null;
+            let righttemplate = template[ret.qr.template];
+            let answer = checker.getAnswers(warped, righttemplate.questions, -dx, -dy);
+            ret.answers = answer.answers;
+            if (ret.qr.template == 0) {
+                ret.noma = checker.getNoma(warped, righttemplate.noma, -dx, -dy);
+            } else {
+                ret.noma = null;
+            }
+            ret.group = group.group;
+            ret.failed = answer.failed;
+            ret.errors = answer.errors;
+            ret.template = righttemplate.filename;
+            if ("read" in answer) ret.read = answer.read;
+            ret.dx = dx;
+            ret.dy = dy;
         }
-        ret.group = group.group;
-        ret.failed = answer.failed;
-        ret.errors = answer.errors;
-        ret.template = righttemplate.filename;
-        ret.dx = dx;
-        ret.dy = dy;    
     } else {
         let scores = [];
         let idx;
@@ -1875,20 +1921,21 @@ async function computeDrift({ template, projectpath, warped, group, ret, pageidc
             dx = righttemplate.group[0][0].x - group.x;
             dy = righttemplate.group[0][0].y - group.y;
         }
-    
+
         if (dy < -2) dy = -2;
         if (dy > 2) dy = 2;
         if (dx < -2) dx = -2;
         if (dx > 2) dx = 2;
-    
+
         ret.answers = answers[best].answers;
         ret.noma = checker.getNoma(warped, righttemplate.noma, -dx, -dy);
         ret.group = group.group;
         ret.failed = answers[best].failed;
         ret.errors = answers[best].errors;
+        if ("read" in answers[best]) ret.read = answers[best].read;
         ret.template = righttemplate.filename;
         ret.dx = dx;
-        ret.dy = dy;    
+        ret.dy = dy;
     }
 
 }

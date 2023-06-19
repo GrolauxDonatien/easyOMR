@@ -308,3 +308,19 @@ pre {
     width: 12px;
     text-align: center;
 }
+
+.scanbuttons .ignore {
+    font-style: normal;
+    font-weight: bold;
+}
+
+#infomsg {
+    float: right;
+    color: white;
+    transform: none;
+    border: none;
+    position: fixed;
+    right: 0px;
+    margin-right: 10px;
+    display:inline;
+}

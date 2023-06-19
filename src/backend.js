@@ -20,6 +20,7 @@ const prompt = require("electron-prompt");
 const AsyncFunction = (async () => { }).constructor;
 const ZIPCUTSIZE = 30 * 1024 * 1024; // when exporting clear scans for Moodle, zip files are cut after 25 MB is reached
 
+
 let getWindow, setMenu, menuTemplate;
 
 let watches = {};
@@ -179,7 +180,7 @@ let actions = {
         let projectpath = fspath.dirname(fspath.dirname(path));
         let image = await readFile(path);
         let { warped, group, ret } = omr.getNormalizedImage({ strings, path, image, template, corners });
-        if (ret.group != "99") await omr.computeDrift({ template, projectpath, warped, group, ret, pageidcache });
+        if (ret.group != "99") await omr.computeDrift({ template, projectpath, warped, group, ret, pageidcache, strings });
         return ret;
     },
     "file-scan-fixed": async function ({ path, template, strings, corners = null }) {
@@ -239,6 +240,7 @@ let actions = {
         ret.template = righttemplate.filename;
         ret.dx = dx;
         ret.dy = dy;
+        if ("read" in result) ret.read=result.read;
         return ret;
     },
     "file-image": async function ({ path, corners }) {
@@ -1084,5 +1086,5 @@ module.exports = {
                 event.sender.send("ajax-reply", arg);
             }
         });
-    }
+    }, actions, readFile, formatFilename
 }
