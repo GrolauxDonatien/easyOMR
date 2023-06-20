@@ -9,7 +9,7 @@ const tfn = require("@tensorflow/tfjs-node");
 const jsQR = require("jsqr");
 
 const CREATETRAINDATA = false;
-const OPENCV = true;
+const OPENCV = false;
 
 const LO_OPENCVTHRESHOLD_NO = 0.02;
 const LO_OPENCVTHRESHOLD_LOWMAYBE = 0.08;
@@ -278,7 +278,11 @@ const utils = (() => {
     }
 
     function imageDenoised(image, level = 1.0) {
-        return image.gaussianBlur(new Size(5, 5), level);
+        if (CREATETRAINDATA || OPENCV) { // only denoise for opencv, tensorflow works better if denoised is avoided
+            return image.gaussianBlur(new Size(5, 5), level);
+        } else {
+            return image;
+        }
     }
 
     function imageEdged(image) {
@@ -805,12 +809,12 @@ const checker = (() => {
             function checkStable(proposal) {
                 return proposal;
                 // does not really work
-/*                let verticalStructure = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(1, warped.sizes[0] * 0.75));
-                mask = warped.erode(verticalStructure, new cv.Point(-1, -1));
-                let t2 = mask.countNonZero() / (mask.sizes[0] * mask.sizes[1]);
-                if (t2 / t > 1.2 || t / t2 > 1.2) {
-                    return { t, t2, guess: "maybe" };
-                } else return proposal;*/
+                /*                let verticalStructure = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(1, warped.sizes[0] * 0.75));
+                                mask = warped.erode(verticalStructure, new cv.Point(-1, -1));
+                                let t2 = mask.countNonZero() / (mask.sizes[0] * mask.sizes[1]);
+                                if (t2 / t > 1.2 || t / t2 > 1.2) {
+                                    return { t, t2, guess: "maybe" };
+                                } else return proposal;*/
             }
             if (t < (high ? HI_OPENCVTHRESHOLD_NO : LO_OPENCVTHRESHOLD_NO)) {
                 if (DEBUG) cv.imwrite('no_' + (count++) + ".jpg", warped);
@@ -862,12 +866,6 @@ const checker = (() => {
         return noma.join("");
     }
 
-    let thresholdYes1 = 1000;
-    let thresholdYes2 = -3000;
-    let thresholdNo1 = -3000;
-    let thresholdNo2 = -6000;
-
-
     function predict(images) {
         tf.engine().startScope();
         let tss = [];
@@ -880,27 +878,41 @@ const checker = (() => {
         tf.engine().endScope();
         let ret = [];
 
-        for (let i = 0; i < images.length; i++) {
-            let yes1 = res[i * 2 + 1] > thresholdYes1;
-            let yes2 = res[i * 2] < thresholdYes2;
-            let no1 = res[i * 2] > thresholdNo1;
-            let no2 = res[i * 2 + 1] < thresholdNo2;
+        /* how to figure out next part:
+            in terminal, run:
+                .\node_modules\.bin\electron.cmd . tstoexcel
+            open short.xslx (limited to 5k lines otherwise Excel tends to become incredibly slow)
+                find conditions based on the two scores that safely filter out all true, false, and maybe situations
+                in the code below, I sorted by score2, then found limits that made sense, filtering out everything except true
+                which is the reason why this is the last case
+        */
 
-            let r;
-            if (yes1 && yes2) { // surely a tick and surely not an untick
-                r = true;
-            } else if (no1 && no2) {
-                r = false;
-            } else if (yes1 || yes2) { // surely a tick or surely not an untick
-                //                cv.imwrite(`maybe_${yes1}_${res[i*2+1]}_${yes2}_${res[i*2]}.jpg`,images[i]);
-                r = "maybe";
-            } else if (no1 || no2) {
-                r = false;
+        for (let i = 0; i < images.length; i++) {
+            let d2 = res[i * 2];
+            let c2 = res[i * 2 + 1];
+            if (d2<-25000 && c2<-25000) {
+                ret.push(false);
+            } else if (d2<-25000 && c2<-20000 && c2<=-25000) {
+                ret.push("maybe");
+            } else if (d2<-25000 && c2>=-20000) {
+                ret.push(true);
+            } else if (d2>-800) {
+                ret.push(false);
+            } else if (c2<-10000) {
+                ret.push("maybe");
+            } else if (c2>-9000 && d2>-6000) {
+                ret.push(false);
+            } else if (c2>-9000 && d2<-10000) {
+                ret.push(true);
+            } else if (d2>-11000) {
+                ret.push("maybe");
             } else {
-                r = "unknown" // do not know
+                ret.push(true);
             }
-            ret.push(r);
+            // cv.imwrite(fspath.join('out',`${ret[ret.length-1]}_${res[i * 2 + 1]}_${res[i * 2]}.jpg`), images[i]);
         }
+
+
         return ret;
     }
 
@@ -908,9 +920,8 @@ const checker = (() => {
         let failed = [];
         let answers = [];
         let errors = 0;
+        let images = [];
         for (let line = 0; line < coords.length; line++) {
-            let images = [];
-            let answer = [];
             for (let col = 0; col < coords[line].length; col++) {
                 let bb = coords[line][col];
                 let ox = bb.x - 5 + dx;
@@ -927,7 +938,13 @@ const checker = (() => {
                 let img = image.getRegion(rect).copy();
                 images.push(img);
             }
-            let ret = predict(images);
+        }
+        let all = predict(images);
+        let idx=0;
+        for (let line = 0; line < coords.length; line++) {
+            let answer = [];
+            let ret=all.slice(idx,idx+coords[line].length);
+            idx+=ret.length;
             for (let col = 0; col < ret.length; col++) {
                 if (ret[col] == "unknown") { // maybe it is empty empty ?
                     if (failed[line] == undefined) failed[line] = [];
@@ -1057,11 +1074,12 @@ const checker = (() => {
         return { answers, failed, errors, read };
     }
 
-    const getAnswers = (CREATETRAINDATA || OPENCV) ? getAnswers_opencv : getAnswers_tensorflow
+    const getAnswers = (CREATETRAINDATA || OPENCV) ? getAnswers_opencv : getAnswers_tensorflow;
+
 
     function getResult(image, template, dx, dy) {
         // process according to this single template
-        let noma = getNoma(image, template.noma, dx, dy);
+        let noma = template.noma==null?null:getNoma(image, template.noma, dx, dy);
         let answers = getAnswers(image, template.questions, dx, dy);
         let group;
         if ("thisgroup" in template) {

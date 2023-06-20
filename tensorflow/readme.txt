@@ -17,12 +17,20 @@ Step 2:
 
 Step 3:
     https://www.tensorflow.org/datasets/add_dataset
-    tfds new omrset
-    configure omrset.py :
-        shape=(40,40,1),
-        remove downloads,
-        set paths to ../train_images and ../test_images
-        'label': 'yes' if f.name.startswith('yes_') else 'no'
+    in train directory, if there is no omrset subdirectory :
+        tfds new omrset
+        cd omrset
+        configure omrset.py :
+            'image': tfds.features.Image(shape=(40, 40, 1)),,
+            comment dl_manager.download_and_extract,
+            set     logging.warning(os.path.abspath(Path() / '..' /'..' / 'train' / 'train_images'))
+                    return {
+                        'train': self._generate_examples(Path() / '..' / '..' /'train' / 'train_images'),
+                        'test': self._generate_examples(Path() / '..' / '..' /'train' / 'test_images'),
+                    }
+            at the very end: 'label': 'yes' if f.name.startswith('yes_') else 'no'
+
+    in train/omrset directory, run
     tfds build
     => creates the dataset in \Users\XXX\tensorflow_datasets\omrset
 

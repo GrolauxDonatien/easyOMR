@@ -55,6 +55,6 @@ cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
 
 model.fit(
     ds_train,
-    epochs=50,
+    epochs=500,
     validation_data=ds_test,
     callbacks=[cp_callback])  # Pass callback to training

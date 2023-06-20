@@ -14,7 +14,7 @@
                 "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
             },
             "args": [
-                ".", "trainingdata", "D:\\ICHEC\\FondInfo-GesEnt-2023\\examenblancs", "D:\\ICHEC\\training"
+                "."
             ],
             "outputCapture": "std"
         },
@@ -35,6 +35,29 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}\\test.js"
+        },
+        {
+            "name": "Export train data",
+            "description":"Some scripts require librairies of easyOMR, running them through electron ensures compatibility",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
+            "windows": {
+                "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
+            },
+            "args": [
+                ".",
+                "trainingdata",
+                "projectSrc",
+                "trainingDst"
+            ],
+            "args for running another script": [
+                ".",
+                "batchinvert",
+                "directory"
+            ],
+            "outputCapture": "std"
         }
     ]
 }

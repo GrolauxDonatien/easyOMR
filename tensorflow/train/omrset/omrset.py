@@ -50,11 +50,11 @@ class Omrset(tfds.core.GeneratorBasedBuilder):
 
     # TODO(omrset): Returns the Dict[split names, Iterator[Key, Example]]
 
-    logging.warning(os.path.abspath(Path() / 'train' / 'train_images'))
+    logging.warning(os.path.abspath(Path() / '..' /'..' / 'train' / 'train_images'))
 
     return {
-        'train': self._generate_examples(Path() / 'train' / 'train_images'),
-        'test': self._generate_examples(Path() / 'train' / 'test_images'),
+        'train': self._generate_examples(Path() / '..' / '..' /'train' / 'train_images'),
+        'test': self._generate_examples(Path() / '..' / '..' /'train' / 'test_images'),
     }
 
   def _generate_examples(self, path):
