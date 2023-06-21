@@ -246,7 +246,7 @@ let actions = {
     "file-image": async function ({ path, corners }) {
         let ret = {};
         let image = await readFile(path);
-        let cropped = omr.utils.cropNormalizedCorners(corners, image);
+        let cropped = corners==null?image:omr.utils.cropNormalizedCorners(corners, image);
         ret.image = cv.imencode(".jpg", cropped).toString("base64");
         ret.path = path;
         return ret;

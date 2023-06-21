@@ -105,6 +105,8 @@
                 <button class="ro" style="display:none"><span style='color:red'>&#9744;</span> &#8594; <span
                         style='color:black'>&#9744;</span></button>
                 &nbsp;&nbsp;&nbsp;
+                <button class="ignore" title="Ignore this scan">&#128465;</button>
+                &nbsp;&nbsp;&nbsp;
                 <button class="save"
                     title="S to save or CTRL+S to save and select the next first scan in the list.">Save</button>
                 <button class="cancel" title="Esc to cancel">Cancel</button>
@@ -160,6 +162,7 @@
         <a data-id="scans">Scans<span></span></a>
         <a data-id="position" style="display:none;">Reposition<span></span></a>
         <a data-id="export">Exports<span></span></a>
+        <div id="infomsg"></div>
     </div>
     <script>
         localStorage.setItem("easyOMR-lang","en");
@@ -252,7 +255,8 @@ save into the template directory of this project, replacing the pdf file present
             delete:"Delete",
             copy:"Copy",
             continue: "Continue",
-            cancel: "Cancel"
+            cancel: "Cancel",
+            confirm:'Are you sure?'
         }
     </script>
     <script src="api.js"></script>

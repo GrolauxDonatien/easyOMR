@@ -639,7 +639,7 @@ const project = (() => {
                     if (current.template[i].thisgroup == info.group) count += current.template[i].questions.length;
                 }
             }
-            api("file-image", { path: joinPath(path, info.filename), corners: info.corners }, (result) => {
+            api("file-image", { path: joinPath(path, info.filename), corners: (info.error==fileScanStrings.cornersError)?null:info.corners }, (result) => {
                 if (result.path != joinPath(path, info.filename)) return;
                 let image = new Image();
                 image.onload = () => {
