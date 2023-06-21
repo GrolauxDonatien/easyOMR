@@ -50,7 +50,7 @@ async function run() {
     }
     await wb.write(path.join(root,'..','short.xlsx'));
     console.log(path.join(root,'..','short.xlsx'));
-    return new Promise(()=>{});
+    return new Promise(()=>{}); // suspend indefinitely so that the excel file has time to be written
 }
 
 module.exports = {

@@ -8,8 +8,7 @@ const tf = require('@tensorflow/tfjs')
 const tfn = require("@tensorflow/tfjs-node");
 const jsQR = require("jsqr");
 
-const CREATETRAINDATA = false;
-const OPENCV = false;
+const PREDICTIONMODE = "best";
 
 const LO_OPENCVTHRESHOLD_NO = 0.02;
 const LO_OPENCVTHRESHOLD_LOWMAYBE = 0.08;
@@ -19,16 +18,15 @@ const LO_OPENCVTHRESHOLD_HIGHMAYBE = 0.94;
 const HI_OPENCVTHRESHOLD_NO = 0.01;
 const HI_OPENCVTHRESHOLD_LOWMAYBE = 0.20;
 const HI_OPENCVTHRESHOLD_YES = 0.70;
-const HI_OPENCVTHRESHOLD_HIGHMAYBE = 0.90;
+const HI_OPENCVTHRESHOLD_HIGHMAYBE = 0.97;
 
 let omrmodel;
 
-async function loadOMRModel() {
+let asyncomrmodel = new Promise(async (resolve, reject) => {
     const handler = tfn.io.fileSystem(fspath.resolve(__dirname, "../resources/model.json"));
     omrmodel = await tf.loadLayersModel(handler);
-}
-
-loadOMRModel();
+    resolve(omrmodel);
+})
 
 const REFSIZE = 2000;
 
@@ -278,7 +276,7 @@ const utils = (() => {
     }
 
     function imageDenoised(image, level = 1.0) {
-        if (CREATETRAINDATA || OPENCV) { // only denoise for opencv, tensorflow works better if denoised is avoided
+        if (PREDICTIONMODE == "opencv") { // only denoise for opencv, tensorflow works better if denoised is avoided
             return image.gaussianBlur(new Size(5, 5), level);
         } else {
             return image;
@@ -704,17 +702,21 @@ const checker = (() => {
         for (let i = 0; i < contours.length; i++) contours[i].bb = contours[i].boundingRect();
         let top = warped.sizes[0] - 1, bottom = 0; // figure out top & bottom
         let cleft = warped.sizes[1] - 1, cright = 0; // maybe figure out left & right
-        let fullhoriz = false;
-        let fullvert = false;
+        let foundhoriz=false, foundvert=false;
         for (let i = 0; i < contours.length; i++) {
             if (contours[i].bb.width > 25 && contours[i].bb.height > 25) { // a big complete horizontal structure => mostly full
-                fullhoriz = true;
+                // check density
+                let t = mask.getRegion(contours[i].bb).countNonZero() / (contours[i].bb.width * contours[i].bb.height);
+                if (t > LO_OPENCVTHRESHOLD_HIGHMAYBE ) {
+                    return { t, guess: false };
+                }
             }
-            if (contours[i].bb.width > 12) { // vertical bar
+            if (contours[i].bb.width > 12) { // horizontal bar
                 top = Math.min(top, contours[i].bb.y + contours[i].bb.height + 1);
                 bottom = Math.max(bottom, contours[i].bb.y - 1);
                 cleft = Math.min(cleft, contours[i].bb.x);
                 cright = Math.max(cright, contours[i].bb.x + contours[i].bb.width);
+                foundhoriz=true;
             }
         }
 
@@ -730,22 +732,29 @@ const checker = (() => {
         let left = warped.sizes[1] - 1, right = 0;
         for (let i = 0; i < contours.length; i++) {
             if (contours[i].bb.width > 25 && contours[i].bb.height > 25) { // a big complete horizontal structure => mostly full
-                fullvert = true;
+                // check density
+                let t = mask.getRegion(contours[i].bb).countNonZero() / (contours[i].bb.width * contours[i].bb.height);
+                if (t > LO_OPENCVTHRESHOLD_HIGHMAYBE ) {
+                    return { t, guess: false };
+                }
             }
             if (contours[i].bb.height > 12) { // vertical bar
-                ctop = Math.min(ctop, contours[i].bb.y);
-                cbottom = Math.max(cbottom, contours[i].bb.y + contours[i].bb.height);
-                left = Math.min(left, contours[i].bb.x + contours[i].bb.width + 1);
-                right = Math.max(right, contours[i].bb.x - 1);
+                if (Math.abs(contours[i].bb.x-cleft)<5 || Math.abs(contours[i].bb.x+contours[i].bb.width-cleft)<5
+                || Math.abs(contours[i].bb.x-cright)<5 || Math.abs(contours[i].bb.x+contours[i].bb.width-cright)<5) {
+                    foundvert=true;
+                    ctop = Math.min(ctop, contours[i].bb.y);
+                    cbottom = Math.max(cbottom, contours[i].bb.y + contours[i].bb.height);
+                    left = Math.min(left, contours[i].bb.x + contours[i].bb.width + 1);
+                    right = Math.max(right, contours[i].bb.x - 1);
+                }
             }
         }
 
-        if (fullhoriz || fullvert) {
-            if (DEBUG) cv.imwrite('autofull_' + (count++) + ".jpg", warped);
-            return { t: 1.0, guess: false };
+        if (!foundhoriz || !foundvert) {
+            return { t:-1.0, guess: "maybe" };
         }
 
-        // box position may be inaccurate due to several factors. In particular, le pdf rendering of cairo
+        // box position may be inaccurate due to several factors. In particular, pdf rendering by cairo
         // is often a bit different from the renderer engines of adobe and so. This introduces a shift of the
         // box targeting in the scans, and the full box is not captured completely.
         // This effect is partly mitigated because the input box for this function is artificially made bigger than
@@ -866,7 +875,7 @@ const checker = (() => {
         return noma.join("");
     }
 
-    function predict(images) {
+    function predict(images, opencv = false) {
         tf.engine().startScope();
         let tss = [];
         for (let i = 0; i < images.length; i++) {
@@ -900,23 +909,26 @@ const checker = (() => {
             } else if (d2 > -800) {
                 ret.push(false);
             } else if (c2 < -10000) {
-                // should be maybe, but opencv may guess better
-                let ocv = checkBox(images[i]).guess;
-                if (ocv != "maybe") {
-                    cv.imwrite(fspath.join('out', `${ocv}_${res[i * 2 + 1]}_${res[i * 2]}.jpg`), images[i]);
+                if (opencv) {
+                    // should be maybe, but opencv may guess better
+                    let ocv = checkBox(images[i]).guess;
+                    ret.push(ocv);
+                } else {
+                    ret.push('maybe');
                 }
-                ret.push(ocv);
             } else if (c2 > -9000 && d2 > -6000) {
                 ret.push(false);
             } else if (c2 > -9000 && d2 < -10000) {
                 ret.push(true);
             } else if (d2 > -11000) {
                 // should be maybe, but opencv may guess better
-                let ocv = checkBox(images[i]).guess;
-                if (ocv != "maybe") {
-                    cv.imwrite(fspath.join('out', `${ocv}_${res[i * 2 + 1]}_${res[i * 2]}.jpg`), images[i]);
+                if (opencv) {
+                    // should be maybe, but opencv may guess better
+                    let ocv = checkBox(images[i]).guess;
+                    ret.push(ocv);
+                } else {
+                    ret.push('maybe');
                 }
-                ret.push(ocv);
             } else {
                 ret.push(true);
             }
@@ -926,7 +938,11 @@ const checker = (() => {
         return ret;
     }
 
-    function getAnswers_tensorflow(image, coords, dx = 0, dy = 0) {
+    function getAnswers_best(image, coords, dx = 0, dy = 0) {
+        return getAnswers_tensorflow(image, coords, dx, dy, true);
+    }
+
+    function getAnswers_tensorflow(image, coords, dx = 0, dy = 0, opencv = false) {
         let failed = [];
         let answers = [];
         let errors = 0;
@@ -935,21 +951,21 @@ const checker = (() => {
             for (let col = 0; col < coords[line].length; col++) {
                 let bb = coords[line][col];
                 let ox = bb.x - 5 + dx;
-                if (ox < 0) ox = 0;
                 let oy = bb.y - 5 + dy;
-                if (oy < 0) oy = 0;
                 if (ox + 40 >= image.sizes[1]) {
                     ox = image.sizes[1] - 41;
                 }
                 if (oy + 40 >= image.sizes[0]) {
                     oy = image.sizes[0] - 41;
                 }
+                if (ox < 0) ox = 0;
+                if (oy < 0) oy = 0;
                 let rect = new cv.Rect(ox, oy, 40, 40); // take more space, gives a better chance to checkBox to find the actual box
                 let img = image.getRegion(rect).copy();
                 images.push(img);
             }
         }
-        let all = predict(images);
+        let all = predict(images, opencv);
         let idx = 0;
         for (let line = 0; line < coords.length; line++) {
             let answer = [];
@@ -1007,16 +1023,16 @@ const checker = (() => {
             for (let col = 0; col < coords[line].length; col++) {
                 let bb = coords[line][col];
                 let ox = bb.x - 5 + dx;
-                if (ox < 0) ox = 0;
                 let oy = bb.y - 5 + dy;
-                if (oy < 0) oy = 0;
                 if (ox + bb.w + 10 >= image.sizes[1]) {
                     ox = image.sizes[1] - bb.w - 11;
                 }
                 if (oy + bb.h + 10 >= image.sizes[0]) {
                     oy = image.sizes[0] - bb.h - 11;
                 }
-                let rect = new cv.Rect(ox, oy, bb.w + 10, bb.h + 10); // take more space, gives a better chance to checkBox to find the actual box
+                if (ox < 0) ox = 0;
+                if (oy < 0) oy = 0;
+                let rect = new cv.Rect(ox, oy, Math.min(ox + image.sizes[1], bb.w + 10), Math.min(ox + image.sizes[0], bb.h + 10)); // take more space, gives a better chance to checkBox to find the actual box
                 let mask = image.getRegion(rect);
                 let readbox = checkBox(mask);
                 if (read[line] == undefined) read[line] = [];
@@ -1043,23 +1059,6 @@ const checker = (() => {
                     case false:
                         break;
                 }
-                if (CREATETRAINDATA) {
-                    if (state == true) {
-                        state = "yes";
-                    } else if (state == false) {
-                        state = "no";
-                    }
-                    if (ox + 40 >= image.sizes[1]) {
-                        ox = image.sizes[1] - 41;
-                    }
-                    if (oy + 40 >= image.sizes[0]) {
-                        oy = image.sizes[0] - 41;
-                    }
-                    let rect = new cv.Rect(ox, oy, 40, 40); // take more space, gives a better chance to checkBox to find the actual box
-                    let img = image.getRegion(rect).copy();
-                    let hash = require('crypto').createHash('md5').update(img.getData()).digest("hex");
-                    cv.imwrite(fspath.join("tensorflow", "train", state, hash + ".jpg"), img);
-                }
             }
             if (failed[line]) {
                 let allempty = true;
@@ -1084,7 +1083,7 @@ const checker = (() => {
         return { answers, failed, errors, read };
     }
 
-    const getAnswers = (CREATETRAINDATA || OPENCV) ? getAnswers_opencv : getAnswers_tensorflow;
+    const getAnswers = PREDICTIONMODE == "opencv" ? getAnswers_opencv : (PREDICTIONMODE == "best" ? getAnswers_best : getAnswers_tensorflow);
 
 
     function getResult(image, template, dx, dy) {
@@ -1282,7 +1281,7 @@ const checker = (() => {
     }
 
     return {
-        getNoma, getAnswers, getResult, getResults, createImageResults, getGroup
+        getNoma, getAnswers, getResult, getResults, createImageResults, getGroup, getAnswers_opencv, getAnswers_tensorflow, getAnswers_best
     }
 })();
 
@@ -1653,7 +1652,7 @@ const pdf = (() => {
         return pdfBytes = await pdfDoc.save();
     }
 
-    const PDFCOUNTCACHE={};
+    const PDFCOUNTCACHE = {};
 
     async function getPagesCount(file) {
         // because of the way watch directories work, getPagesCount may be called several times in fast succession for the same file
@@ -1663,18 +1662,18 @@ const pdf = (() => {
         // PDFCOUNTCACHE is a memory leak, however it consumes very little memory
         let key;
         try {
-            let stat=fs.statSync(file);
-            key=file+"|"+stat.mtime+"|"+stat.size;
+            let stat = fs.statSync(file);
+            key = file + "|" + stat.mtime + "|" + stat.size;
             if (key in PDFCOUNTCACHE) return PDFCOUNTCACHE[key];
         } catch (_) {
             return 0;
         }
 
-        PDFCOUNTCACHE[key]=new Promise(async (resolve,reject)=>{
+        PDFCOUNTCACHE[key] = new Promise(async (resolve, reject) => {
             try {
                 const pdfDocument = fs.readFileSync(file);
                 const doc = await PDFDocument.load(pdfDocument);
-                resolve(doc.getPages().length);    
+                resolve(doc.getPages().length);
             } catch (e) {
                 // remove from cache: maybe file was locked and may work fine later on, and we should not keep this failed promise for later calls
                 delete PDFCOUNTCACHE[key];
@@ -1994,5 +1993,5 @@ async function computeDrift({ template, projectpath, warped, group, ret, pageidc
 }
 
 module.exports = {
-    getNormalizedImage, computeDrift, templater, checker, utils, REFSIZE, colors, project, pdf, debug(d) { DEBUG = d; }, AREA_GROUP, QR1, QRS
+    getNormalizedImage, computeDrift, templater, checker, utils, REFSIZE, colors, project, pdf, debug(d) { DEBUG = d; }, AREA_GROUP, QR1, QRS, omrmodel: asyncomrmodel
 }
