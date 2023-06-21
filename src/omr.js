@@ -19,7 +19,7 @@ const LO_OPENCVTHRESHOLD_HIGHMAYBE = 0.94;
 const HI_OPENCVTHRESHOLD_NO = 0.01;
 const HI_OPENCVTHRESHOLD_LOWMAYBE = 0.20;
 const HI_OPENCVTHRESHOLD_YES = 0.70;
-const HI_OPENCVTHRESHOLD_HIGHMAYBE = 0.94;
+const HI_OPENCVTHRESHOLD_HIGHMAYBE = 0.90;
 
 let omrmodel;
 
@@ -742,7 +742,7 @@ const checker = (() => {
 
         if (fullhoriz || fullvert) {
             if (DEBUG) cv.imwrite('autofull_' + (count++) + ".jpg", warped);
-            return false;
+            return { t: 1.0, guess: false };
         }
 
         // box position may be inaccurate due to several factors. In particular, le pdf rendering of cairo
@@ -890,26 +890,36 @@ const checker = (() => {
         for (let i = 0; i < images.length; i++) {
             let d2 = res[i * 2];
             let c2 = res[i * 2 + 1];
-            if (d2<-25000 && c2<-25000) {
+            if (d2 < -25000 && c2 < -25000) {
                 ret.push(false);
-            } else if (d2<-25000 && c2<-20000 && c2<=-25000) {
+            } else if (d2 < -25000 && c2 < -20000 && c2 <= -25000) {
+                // almost full => always maybe
                 ret.push("maybe");
-            } else if (d2<-25000 && c2>=-20000) {
+            } else if (d2 < -25000 && c2 >= -20000) {
                 ret.push(true);
-            } else if (d2>-800) {
+            } else if (d2 > -800) {
                 ret.push(false);
-            } else if (c2<-10000) {
-                ret.push("maybe");
-            } else if (c2>-9000 && d2>-6000) {
+            } else if (c2 < -10000) {
+                // should be maybe, but opencv may guess better
+                let ocv = checkBox(images[i]).guess;
+                if (ocv != "maybe") {
+                    cv.imwrite(fspath.join('out', `${ocv}_${res[i * 2 + 1]}_${res[i * 2]}.jpg`), images[i]);
+                }
+                ret.push(ocv);
+            } else if (c2 > -9000 && d2 > -6000) {
                 ret.push(false);
-            } else if (c2>-9000 && d2<-10000) {
+            } else if (c2 > -9000 && d2 < -10000) {
                 ret.push(true);
-            } else if (d2>-11000) {
-                ret.push("maybe");
+            } else if (d2 > -11000) {
+                // should be maybe, but opencv may guess better
+                let ocv = checkBox(images[i]).guess;
+                if (ocv != "maybe") {
+                    cv.imwrite(fspath.join('out', `${ocv}_${res[i * 2 + 1]}_${res[i * 2]}.jpg`), images[i]);
+                }
+                ret.push(ocv);
             } else {
                 ret.push(true);
             }
-            // cv.imwrite(fspath.join('out',`${ret[ret.length-1]}_${res[i * 2 + 1]}_${res[i * 2]}.jpg`), images[i]);
         }
 
 
@@ -940,11 +950,11 @@ const checker = (() => {
             }
         }
         let all = predict(images);
-        let idx=0;
+        let idx = 0;
         for (let line = 0; line < coords.length; line++) {
             let answer = [];
-            let ret=all.slice(idx,idx+coords[line].length);
-            idx+=ret.length;
+            let ret = all.slice(idx, idx + coords[line].length);
+            idx += ret.length;
             for (let col = 0; col < ret.length; col++) {
                 if (ret[col] == "unknown") { // maybe it is empty empty ?
                     if (failed[line] == undefined) failed[line] = [];
@@ -1079,7 +1089,7 @@ const checker = (() => {
 
     function getResult(image, template, dx, dy) {
         // process according to this single template
-        let noma = template.noma==null?null:getNoma(image, template.noma, dx, dy);
+        let noma = template.noma == null ? null : getNoma(image, template.noma, dx, dy);
         let answers = getAnswers(image, template.questions, dx, dy);
         let group;
         if ("thisgroup" in template) {
@@ -1643,10 +1653,35 @@ const pdf = (() => {
         return pdfBytes = await pdfDoc.save();
     }
 
+    const PDFCOUNTCACHE={};
+
     async function getPagesCount(file) {
-        const pdfDocument = fs.readFileSync(file);
-        const doc = await PDFDocument.load(pdfDocument);
-        return doc.getPages().length;
+        // because of the way watch directories work, getPagesCount may be called several times in fast succession for the same file
+        // as parsing a large PDF file may take some time, we use a cache to store page counts
+        // because loading a PDF is async, this function must also be async
+        // we store promises in the cache, so that fast successive calls just ends up waiting of the same promise
+        // PDFCOUNTCACHE is a memory leak, however it consumes very little memory
+        let key;
+        try {
+            let stat=fs.statSync(file);
+            key=file+"|"+stat.mtime+"|"+stat.size;
+            if (key in PDFCOUNTCACHE) return PDFCOUNTCACHE[key];
+        } catch (_) {
+            return 0;
+        }
+
+        PDFCOUNTCACHE[key]=new Promise(async (resolve,reject)=>{
+            try {
+                const pdfDocument = fs.readFileSync(file);
+                const doc = await PDFDocument.load(pdfDocument);
+                resolve(doc.getPages().length);    
+            } catch (e) {
+                // remove from cache: maybe file was locked and may work fine later on, and we should not keep this failed promise for later calls
+                delete PDFCOUNTCACHE[key];
+                reject(e);
+            }
+        });
+        return PDFCOUNTCACHE[key];
     }
 
     async function exportPNG(file, n = 1) {
