@@ -1109,6 +1109,14 @@ const project = (() => {
             if (confirm(strings.confirm)) {
                 info.ignore = true;
                 save();
+                setTimeout(() => {
+                    all = [...listEl.querySelectorAll("li")];
+                    if (all.length > 0) {
+                        let event = e = document.createEvent("MouseEvents");
+                        event.initEvent("click", true, true);
+                        all[0].dispatchEvent(event, true);
+                    }
+                }, 1);
             }
 
         }
