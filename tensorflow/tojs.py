@@ -12,15 +12,24 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
 def create_model():
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Flatten(input_shape=(40, 40, 1)),
+    model=tf.keras.models.Sequential([
+        tf.keras.layers.experimental.preprocessing.Rescaling(1./255, input_shape=(40, 40, 1)),
+        tf.keras.layers.Conv2D(16, 1, padding='same', activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Conv2D(32, 1, padding='same', activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Conv2D(64, 1, padding='same', activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Flatten(),
         tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(2)
+        tf.keras.layers.Dense(3)
     ])
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(0.001),
+#        optimizer=tf.keras.optimizers.Adam(0.001),
+        optimizer='adam',
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+#        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+        metrics=['accuracy']
     )
     return model
 

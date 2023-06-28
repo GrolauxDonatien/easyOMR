@@ -49,6 +49,11 @@
             "args": [
                 ".",
                 "predict",
+                "D:\\workspace-git\\easyOMR-Tensorflow\\tensorflow\\train\\test_images"
+            ],
+            "args predict": [
+                ".",
+                "predict",
                 "out"
             ],
             "args creating training data": [

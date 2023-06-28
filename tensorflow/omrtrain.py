@@ -31,15 +31,32 @@ ds_test = ds_test.cache()
 ds_test = ds_test.prefetch(tf.data.AUTOTUNE)
 
 def create_model():
-    model = tf.keras.models.Sequential([
+    """model = tf.keras.models.Sequential([
         tf.keras.layers.Flatten(input_shape=(40, 40, 1)),
+        tf.keras.layers.Rescaling(1./255),
         tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(2)
+        tf.keras.layers.Dense(32, activation='relu'),
+        tf.keras.layers.Dense(3)
+    ])"""
+    # inspired by https://www.tensorflow.org/tutorials/images/classification
+    model=tf.keras.models.Sequential([
+        tf.keras.layers.Rescaling(1./255, input_shape=(40, 40, 1)),
+        tf.keras.layers.Conv2D(16, 1, padding='same', activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Conv2D(32, 1, padding='same', activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Conv2D(64, 1, padding='same', activation='relu'),
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dense(3)
     ])
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(0.001),
+#        optimizer=tf.keras.optimizers.Adam(0.001),
+        optimizer='adam',
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+#        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+        metrics=['accuracy']
     )
     return model
 
@@ -55,6 +72,6 @@ cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
 
 model.fit(
     ds_train,
-    epochs=500,
+    epochs=100,
     validation_data=ds_test,
     callbacks=[cp_callback])  # Pass callback to training

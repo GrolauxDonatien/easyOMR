@@ -24,3 +24,4 @@ def process(path):
 
 process('yes')
 process('no')
+process('full')

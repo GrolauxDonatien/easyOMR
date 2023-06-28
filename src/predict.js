@@ -6,23 +6,142 @@ const Size = omr.utils.cv.Size;
 const cv = omr.utils.cv;
 const fs = require('fs');
 const xl = require('excel4node');
+const MAXLINE = 10000;
 
 async function run(directory) {
-    let data = [];
+
+    function createExcel(onNew = () => { }, onSave = () => { }) {
+        let current = 0;
+        let wb = null;
+        let line = MAXLINE + 1;
+        let worksheets = {};
+        const self = {
+            async pushLine(ws) {
+                let trigger = false;
+                if (line > MAXLINE) {
+                    if (wb != null) {
+                        let fn = path.join(directory, `result_${current}.xlsx`);
+                        onSave(worksheets, line);
+                        console.log(fn);
+                        await wb.write(fn);
+                    }
+                    current++;
+                    wb = new xl.Workbook();
+                    worksheets = {};
+                    trigger = true;
+                    line = 1;
+                } else {
+                    line++;
+                }
+                if (!(ws in worksheets)) {
+                    worksheets[ws] = wb.addWorksheet(ws);
+                }
+                worksheets[ws].row(line).setHeight(40);
+                if (trigger) {
+                    onNew(self);
+                }
+            },
+            cell(ws, col) {
+                if (!(ws in worksheets)) {
+                    worksheets[ws] = wb.addWorksheet(ws);
+                }
+                return worksheets[ws].cell(line, col);
+            },
+            image(ws, col, buffer) {
+                if (!(ws in worksheets)) {
+                    worksheets[ws] = wb.addWorksheet(ws);
+                }
+                worksheets[ws].addImage({
+                    image: buffer,
+                    type: "picture",
+                    position: {
+                        type: "twoCellAnchor",
+                        from: {
+                            col: col,
+                            colOff: 0,
+                            row: line,
+                            rowOff: 0
+                        },
+                        to: {
+                            col: col + 1,
+                            colOff: 0,
+                            row: line + 1,
+                            rowOff: 0
+                        }
+                    }
+                });
+
+            },
+            async close() {
+                line = MAXLINE + 1;
+                return self.pushLine("dummy");
+            }
+        }
+        return self;
+    }
+
     await omr.omrmodel;
     let files = fs.readdirSync(directory);
-    let wb = new xl.Workbook();
-    let ws = wb.addWorksheet("data");
-    let line = 1;
-    ws.cell(1, 1).string("filename");
-    ws.cell(1, 2).string("image");
-    ws.cell(1, 3).string("reference");
-    ws.cell(1, 4).string("best");
-    ws.cell(1, 5).string("tensorflow");
-    ws.cell(1, 6).string("opencv");
-    ws.cell(1, 7).string("ts1");
-    ws.cell(1, 8).string("ts2");
-    ws.cell(1, 9).string("cv");
+    // randomize files
+    files.sort(() => 0.5 - Math.random());
+    let splits = [];
+    while (files.length > 0) {
+        let segment = files.splice(0, Math.min(MAXLINE + 2, files.length));
+        segment.sort(); // sort again
+        splits.push(segment);
+    }
+    files = splits.flat();
+
+    let tsscores = {}
+
+    function getts(ref, i) {
+        let k = ref + i;
+        if (k in tsscores) {
+            return tsscores[k];
+        } else {
+            return [Number.MAX_VALUE, -Number.MAX_VALUE];
+        }
+    }
+
+    function setts(ref, i, v) {
+        let k = ref + i;
+        tsscores[k] = v;
+    }
+
+    let excel = createExcel(() => {
+        excel.cell("data", 1).string("filename");
+        excel.cell('data', 2).string("image");
+        excel.cell('data', 3).string("reference");
+        excel.cell('data', 4).string("best");
+        excel.cell('data', 5).string("tensorflow");
+        excel.cell('data', 6).string("opencv");
+        excel.cell('data', 7).string("cv");
+        excel.cell('data', 8).string("ts1");
+        excel.cell('data', 9).string("ts2");
+        excel.cell('data', 10).string("ts3");
+        excel.pushLine('data');
+//        tsscores={}; // reset min/max
+    }, (wb, line) => {
+        wb.data.cell(line + 2, 2).string("ts1min");
+        wb.data.cell(line + 2, 3).string("ts1max");
+        wb.data.cell(line + 2, 4).string("ts2min");
+        wb.data.cell(line + 2, 5).string("ts2max");
+        wb.data.cell(line + 2, 6).string("ts3min");
+        wb.data.cell(line + 2, 7).string("ts3max");
+        wb.data.cell(line + 3, 1).string("yes");
+        wb.data.cell(line + 4, 1).string("no");
+        wb.data.cell(line + 5, 1).string("full");
+        let keys=["yes","no","full"];
+        for(let i=0; i<keys.length; i++) {
+            let k=keys[i];
+            for(let j=0; j<3 ;j++) {
+                let [min,max]=getts(k,j);
+                wb.data.cell(line+3+i,2+j+j).number(min);
+                wb.data.cell(line+3+i,3+j+j).number(max);
+            } 
+        }
+        console.log(JSON.stringify(tsscores));
+    });
 
     function score(r) {
         if (r.failed.length > 0 && r.failed[0].length > 0) return r.failed[0][0];
@@ -34,7 +153,7 @@ async function run(directory) {
     for (let i = 0; i < files.length; i++) {
         if (files[i].endsWith(".jpg")) {
             console.log(files[i]);
-            line++;
+            await excel.pushLine("data");
             let ref = files[i].split('_')[0];
             let im = cv.imread(path.join(directory, files[i]));
             try {
@@ -42,50 +161,31 @@ async function run(directory) {
             } catch (_) { };
             let coords = [[{ x: 0, y: 0, w: im.sizes[1], h: im.sizes[0] }]];
             let ts = omr.checker.getAnswers_tensorflow(im, coords, 0, 0);
-            if (line==128) debugger;
             let ocv = omr.checker.getAnswers_opencv(im, coords, 0, 0);
             let best = omr.checker.getAnswers_best(im, coords, 0, 0);
 
 
-            ws.row(line).setHeight(40);
-            ws.cell(line, 1).string(files[i]);
+            excel.cell('data', 1).string(files[i]);
             let str = cv.imencode('.jpg', im).toString('base64');
             let buffer = Buffer.from(str, 'base64');
-            ws.addImage({
-                image: buffer,
-                type: "picture",
-                position: {
-                    type: "twoCellAnchor",
-                    from: {
-                        col: 2,
-                        colOff: 0,
-                        row: line,
-                        rowOff: 0
-                    },
-                    to: {
-                        col: 3,
-                        colOff: 0,
-                        row: line + 1,
-                        rowOff: 0
-                    }
-                }
-            });
-            ws.cell(line, 3).string(ref);
-            ws.cell(line, 4).string(score(best));
-            ws.cell(line, 5).string(score(ts));
-            ws.cell(line, 6).string(score(ocv));
-
-            ws.cell(line, 7).number(parseFloat(files[i].split('_')[1]));
-            ws.cell(line, 8).number(parseFloat(files[i].split('_')[2]));
-
-            ws.cell(line, 9).number(ocv.read[0][0]);
-
-
+            excel.image('data', 2, buffer);
+            excel.cell('data', 3).string(ref);
+            excel.cell('data', 4).string(score(best));
+            excel.cell('data', 5).string(score(ts));
+            excel.cell('data', 6).string(score(ocv));
+            excel.cell('data', 7).number(ocv.read[0][0]);
+            let scores = ts.read[0][0].split('/');
+            for (let i = 0; i < scores.length; i++) {
+                let v = parseFloat(scores[i]);
+                let [min, max] = getts(ref, i);
+                if (v < min) min = v;
+                if (v > max) max = v;
+                setts(ref, i, [min, max]);
+                excel.cell('data', 8 + i).number(v);
+            }
         }
     }
-
-    await wb.write(path.join(directory, 'result.xlsx'));
-    console.log(path.join(directory, 'result.xlsx'));
+    await excel.close();
     return new Promise(() => { }); // suspend indefinitely so that the excel file has time to be written
 }
 

@@ -11,8 +11,8 @@ const jsQR = require("jsqr");
 const PREDICTIONMODE = "best";
 
 const LO_OPENCVTHRESHOLD_NO = 0.02;
-const LO_OPENCVTHRESHOLD_LOWMAYBE = 0.08;
-const LO_OPENCVTHRESHOLD_YES = 0.75;
+const LO_OPENCVTHRESHOLD_LOWMAYBE = 0.27;
+const LO_OPENCVTHRESHOLD_YES = 0.80;
 const LO_OPENCVTHRESHOLD_HIGHMAYBE = 0.94;
 
 const HI_OPENCVTHRESHOLD_NO = 0.01;
@@ -702,12 +702,12 @@ const checker = (() => {
         for (let i = 0; i < contours.length; i++) contours[i].bb = contours[i].boundingRect();
         let top = warped.sizes[0] - 1, bottom = 0; // figure out top & bottom
         let cleft = warped.sizes[1] - 1, cright = 0; // maybe figure out left & right
-        let foundhoriz=false, foundvert=false;
+        let foundhoriz = false, foundvert = false;
         for (let i = 0; i < contours.length; i++) {
             if (contours[i].bb.width > 25 && contours[i].bb.height > 25) { // a big complete horizontal structure => mostly full
                 // check density
                 let t = mask.getRegion(contours[i].bb).countNonZero() / (contours[i].bb.width * contours[i].bb.height);
-                if (t > LO_OPENCVTHRESHOLD_HIGHMAYBE ) {
+                if (t > LO_OPENCVTHRESHOLD_HIGHMAYBE) {
                     return { t, guess: false };
                 }
             }
@@ -716,7 +716,7 @@ const checker = (() => {
                 bottom = Math.max(bottom, contours[i].bb.y - 1);
                 cleft = Math.min(cleft, contours[i].bb.x);
                 cright = Math.max(cright, contours[i].bb.x + contours[i].bb.width);
-                foundhoriz=true;
+                foundhoriz = true;
             }
         }
 
@@ -734,14 +734,14 @@ const checker = (() => {
             if (contours[i].bb.width > 25 && contours[i].bb.height > 25) { // a big complete horizontal structure => mostly full
                 // check density
                 let t = mask.getRegion(contours[i].bb).countNonZero() / (contours[i].bb.width * contours[i].bb.height);
-                if (t > LO_OPENCVTHRESHOLD_HIGHMAYBE ) {
+                if (t > LO_OPENCVTHRESHOLD_HIGHMAYBE) {
                     return { t, guess: false };
                 }
             }
             if (contours[i].bb.height > 12) { // vertical bar
-                if (Math.abs(contours[i].bb.x-cleft)<5 || Math.abs(contours[i].bb.x+contours[i].bb.width-cleft)<5
-                || Math.abs(contours[i].bb.x-cright)<5 || Math.abs(contours[i].bb.x+contours[i].bb.width-cright)<5) {
-                    foundvert=true;
+                if (Math.abs(contours[i].bb.x - cleft) < 5 || Math.abs(contours[i].bb.x + contours[i].bb.width - cleft) < 5
+                    || Math.abs(contours[i].bb.x - cright) < 5 || Math.abs(contours[i].bb.x + contours[i].bb.width - cright) < 5) {
+                    foundvert = true;
                     ctop = Math.min(ctop, contours[i].bb.y);
                     cbottom = Math.max(cbottom, contours[i].bb.y + contours[i].bb.height);
                     left = Math.min(left, contours[i].bb.x + contours[i].bb.width + 1);
@@ -751,7 +751,7 @@ const checker = (() => {
         }
 
         if (!foundhoriz || !foundvert) {
-            return { t:-1.0, guess: "maybe" };
+            return { t: -1.0, guess: "maybe" };
         }
 
         // box position may be inaccurate due to several factors. In particular, pdf rendering by cairo
@@ -813,7 +813,7 @@ const checker = (() => {
 
         return checkDensity(warped.getRegion(rect));
 
-        function checkDensity(warped, high = true) {
+        function checkDensity(warped, high = false) {
             let t = warped.countNonZero() / (warped.sizes[0] * warped.sizes[1]);
             function checkStable(proposal) {
                 return proposal;
@@ -897,43 +897,41 @@ const checker = (() => {
         */
 
         for (let i = 0; i < images.length; i++) {
-            let d2 = res[i * 2];
-            let c2 = res[i * 2 + 1];
-            if (d2 < -25000 && c2 < -25000) {
-                ret.push(false);
-            } else if (d2 < -25000 && c2 < -20000 && c2 <= -25000) {
-                // almost full => always maybe
-                ret.push("maybe");
-            } else if (d2 < -25000 && c2 >= -20000) {
-                ret.push(true);
-            } else if (d2 > -800) {
-                ret.push(false);
-            } else if (c2 < -10000) {
-                if (opencv) {
-                    // should be maybe, but opencv may guess better
-                    let ocv = checkBox(images[i]).guess;
-                    ret.push(ocv);
-                } else {
-                    ret.push('maybe');
-                }
-            } else if (c2 > -9000 && d2 > -6000) {
-                ret.push(false);
-            } else if (c2 > -9000 && d2 < -10000) {
-                ret.push(true);
-            } else if (d2 > -11000) {
-                // should be maybe, but opencv may guess better
-                if (opencv) {
-                    // should be maybe, but opencv may guess better
-                    let ocv = checkBox(images[i]).guess;
-                    ret.push(ocv);
-                } else {
-                    ret.push('maybe');
-                }
+            let v3 = res[i * 3];
+            let v2 = res[i * 3 + 1];
+            let v1 = res[i * 3 + 2];
+            let score = {
+                t: v1 + "/" + v2 + "/" + v3,
+            }
+            ret.push(score);
+            let full = (v1 > 1000000 && v1 < 2500000 && v2 > -1300000 && v2 < -490000 && v3 > -5800000 && v3 < -2500000);
+            let yes = (v1 > 520000 && v1 < 2000000 && v2 > -990000 && v2 < -250000 && v3 > -45000000 && v3 < -1250000);
+            let no = (v1 > -200000 && v1 < 890000 && v2 > -490000 && v2 < 200000 && v3 > -2100000 && v3 < -40000);
+
+            if (full && !yes && !no) {
+                score.guess = false; // full in fact
+            } else if (!full && yes && !no) {
+                score.guess = true;
+            } else if (!full && !yes && no) {
+                score.guess = false;
             } else {
-                ret.push(true);
+                if (opencv) {
+                    // should be maybe, but opencv may guess better
+                    let ocv = checkBox(images[i]).guess;
+                    if (ocv === true && yes) {
+                        score.guess = true;
+                    } else if (ocv == false && (no || full)) {
+                        score.guess = false;
+                    } else if (!no && !yes && !full) { // tensorflow does not have a guess => accept the one from opencv
+                        score.guess = ocv;
+                    } else {
+                        score.guess = 'maybe'; // contradictory decisions => maybe
+                    }
+                } else {
+                    score.guess = 'maybe';
+                }
             }
         }
-
 
         return ret;
     }
@@ -947,6 +945,7 @@ const checker = (() => {
         let answers = [];
         let errors = 0;
         let images = [];
+        let read = [];
         for (let line = 0; line < coords.length; line++) {
             for (let col = 0; col < coords[line].length; col++) {
                 let bb = coords[line][col];
@@ -971,8 +970,10 @@ const checker = (() => {
             let answer = [];
             let ret = all.slice(idx, idx + coords[line].length);
             idx += ret.length;
+            if (read[line] == undefined) read[line] = [];
             for (let col = 0; col < ret.length; col++) {
-                if (ret[col] == "unknown") { // maybe it is empty empty ?
+                read[line][col] = ret[col].t;
+                if (ret[col].guess == "unknown") { // maybe it is empty empty ?
                     if (failed[line] == undefined) failed[line] = [];
                     let density = images[col].countNonZero() / (images[col].sizes[0] * images[col].sizes[1]);
                     if (density < 0.01) {
@@ -980,18 +981,18 @@ const checker = (() => {
                     } else {
                         failed[line][col] = 'maybe';
                     }
-                } else if (ret[col] == "maybe") {
+                } else if (ret[col].guess == "maybe") {
                     answer.push(String.fromCharCode(col + 97));
                     if (failed[line] == undefined) failed[line] = [];
                     failed[line][col] = "maybe";
-                } else if (ret[col] == true) {
+                } else if (ret[col].guess == true) {
                     answer.push(String.fromCharCode(col + 97));
                 }
             }
             if (failed[line]) {
                 let allempty = true;
                 for (let col = 0; col < coords[line].length; col++) {
-                    if (ret[col] !== "empty") {
+                    if (ret[col].guess !== "empty") {
                         allempty = false;
                         break;
                     }
@@ -1009,7 +1010,7 @@ const checker = (() => {
             }
         }
 
-        return { answers, failed, errors };
+        return { answers, failed, errors, read };
     }
 
     function getAnswers_opencv(image, coords, dx = 0, dy = 0) {

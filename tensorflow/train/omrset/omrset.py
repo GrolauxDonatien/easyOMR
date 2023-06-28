@@ -33,7 +33,7 @@ class Omrset(tfds.core.GeneratorBasedBuilder):
         features=tfds.features.FeaturesDict({
             # These are the features of your dataset like images, labels ...
             'image': tfds.features.Image(shape=(40, 40, 1)),
-            'label': tfds.features.ClassLabel(names=['no', 'yes']),
+            'label': tfds.features.ClassLabel(names=['no', 'yes', 'full']),
         }),
         # If there's a common (input, target) tuple from the
         # features, specify them here. They'll be used if
@@ -63,5 +63,5 @@ class Omrset(tfds.core.GeneratorBasedBuilder):
     for f in path.glob('*.jpg'):
         yield f.name, {
             'image': f,
-            'label': 'yes' if f.name.startswith('yes_') else 'no',
+            'label': f.name.split("_")[0]
         }

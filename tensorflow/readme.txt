@@ -5,10 +5,14 @@ to convert model to JS, tensorflowjs is required. It is not available in conda,
 however 'pip install tensorflowjs' works in conda virtual environment
 
 Step 1:
-    set flag CREATETRAINDATA to true in omr.js
-    -> defaults the omr recognition to an opencv algorithm
-    Run some recognition
-    -> this will create categorized images into tensorflow/train/[yes/no/empty/maybe/accuracy]
+    -> create training sets using the trainingdata.js script: .\node_modules\.bin\electron.cmd . trainingdata project_directory .\tensorflow\train
+        hint: do this for several projects into different target directories, and merge the result togethor into .\tensorflow\train\(yes/no)
+    -> split no into the full/no sets using the split.js script: .\node_modules\.bin\electron.cmd . split .\tensorflow\train
+    -> *manually* check the purity of each set (yes/no/full).
+        the predict.js script can help: .\node_modules\.bin\electron.cmd . predict .\tensorflow\train\no (yes/full)
+        this will create excel sheets for all images with predictions from tensorflow and opencv. This can help identify errors.
+        the count.js script can also help to split no into no/full: .\node_modules\.bin\electron.cmd . count .\tensorflow\train\no
+        this will rename files by prefixing the count on non zero pixels. By sorting the files, it becomes easy to catch errors.
 
 Step 2:
     run prep.py
@@ -17,29 +21,34 @@ Step 2:
 
 Step 3:
     https://www.tensorflow.org/datasets/add_dataset
+    activate conda environment
     in train directory, if there is no omrset subdirectory :
         tfds new omrset
         cd omrset
         configure omrset.py :
-            'image': tfds.features.Image(shape=(40, 40, 1)),,
+            'image': tfds.features.Image(shape=(40, 40, 1)),
+            'label': tfds.features.ClassLabel(names=['no', 'yes', 'full']),
             comment dl_manager.download_and_extract,
             set     logging.warning(os.path.abspath(Path() / '..' /'..' / 'train' / 'train_images'))
                     return {
                         'train': self._generate_examples(Path() / '..' / '..' /'train' / 'train_images'),
                         'test': self._generate_examples(Path() / '..' / '..' /'train' / 'test_images'),
                     }
-            at the very end: 'label': 'yes' if f.name.startswith('yes_') else 'no'
+            at the very end: 'label': f.name.split("_")[0]
 
     in train/omrset directory, run
+    if it exists, delete directory \Users\XXX\tensorflow_datasets\omrset
     tfds build
     => creates the dataset in \Users\XXX\tensorflow_datasets\omrset
 
 Step 4:
+    exit conda environment, it does not want to see the custom omrset data, however regular python does work fine
     https://www.tensorflow.org/datasets/keras_example
-    run omrtrain.py # for reasons I could not figure out, this would not run from a prompt in the conda virtual environment, but would run from pycharm
+    python omrtrain.py
     -> trains the model and creates a file omr.ckpt.XXXXX
 
 Step 5:
+    activate conda environment
     run tojs.py to export the model for JavaScript
 
 Step 6:
