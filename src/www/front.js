@@ -1899,7 +1899,7 @@ const project = (() => {
             }
             setTimeout(() => loop(0), 100);
         },
-        createCopies(n) {
+        createCopies(n, staple) {
             let lock = lockDisplay(exportStrings.running);
             lock.length(n);
             // loop through setTimeouts so that the browser has a chance to refresh the display
@@ -1913,7 +1913,7 @@ const project = (() => {
                 lock.progress(i);
                 count = 20;
                 if (i + count >= n) count = n - i;
-                api("create-copy", { path: current.path, templates: current.template, count },
+                api("create-copy", { path: current.path, templates: current.template, count, staple },
                     () => { setTimeout(() => { loop(i + count) }, 1); }, // leave a bit of time for the ui to refresh for example if the window is resized
                     () => { loop(i + count); });
             }
@@ -2179,12 +2179,13 @@ document.getElementById("template-create-copies").addEventListener('click', () =
     let diag = dialog({
         title: customTemplateStrings.createCopiesTitle,
         content: customTemplateStrings.createCopies,
-        html: '<input type="number" id="number_of_copies" min="1" max="9999" value="1">',
+        html: '<input type="number" id="number_of_copies" min="1" max="9999" value="1"><br><input type="checkbox" id="staples" style="margin-left:38px">'+customTemplateStrings.staples,
         buttons: {
             [strings.continue]: function () {
-                let v = parseInt(diag.content.querySelector('input').value);
+                let v = parseInt(diag.content.querySelector('input[type=number]').value);
+                let staple=diag.content.querySelector('input[type=checkbox]').checked;
                 if (!isNaN(v) && v > 0) {
-                    project.createCopies(v);
+                    project.createCopies(v, staple);
                 }
                 diag.destroy();
             },

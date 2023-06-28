@@ -14,7 +14,15 @@ const IMAGETYPES = ["bmp", "pbm", "pgm", "ppm", "sr", "ras", "jpeg", "jpg", "jpe
 const uuidv4 = require('uuid').v4;
 const QRCode = require("qrcode");
 const MemoryStream = require('memorystream');
-const { PDFDocument, StandardFonts, rgb, PDFImage } = require("pdf-lib");
+const { PDFDocument, StandardFonts, rgb, PDFImage,
+    PDFDocumentFactory,
+    PDFNumber,
+    PDFRawStream,
+    PDFArray,
+    pushGraphicsState,
+    popGraphicsState,
+    translate, scale,
+    PDFDocumentWriter } = require("pdf-lib");
 const prompt = require("electron-prompt");
 
 const AsyncFunction = (async () => { }).constructor;
@@ -586,7 +594,7 @@ let actions = {
         cv.imwrite(exportpath, tplimage, [cv.IMWRITE_JPEG_QUALITY, 25]);
         return true;
     },
-    "create-copy": async function ({ path, templates, count }) {
+    "create-copy": async function ({ path, templates, count=1, staple=false }) {
         const Point2 = omr.utils.cv.Point2;
         const Size = omr.utils.cv.Size;
         const Rect = omr.utils.cv.Rect;
@@ -702,7 +710,6 @@ let actions = {
                         pdfDoc = await PDFDocument.create();
                     }
                     let [page] = await pdfDoc.copyPages(tpls[t].pdf, [tpls[t].page]);
-                    pdfDoc.addPage(page);
 
                     const jpgImage = await pdfDoc.embedJpg(cv.imencode(".jpg", qrcode, [cv.IMWRITE_JPEG_QUALITY, 100]));
                     let coords = {
@@ -739,6 +746,13 @@ let actions = {
 
                     page.drawText("ref:" + id, { size: page.getWidth() / 80 });
 
+                    if (staple) {
+                        page.scaleContent(0.9,0.9);
+                        page.translateContent(page.getWidth()*0.1, page.getWidth()*0.05);
+                    }
+
+                    pdfDoc.addPage(page);
+
                     const pdfBytes = await pdfDoc.save();
                     fs.writeFileSync(exportpath, pdfBytes);
 
@@ -754,9 +768,16 @@ let actions = {
                     }
                     img.putText("ref:" + id, tc, font, 1, omr.colors.BLACK, 2);
 
-                    qrcode.bgrToGray().copyTo(img.getRegion(new Rect(x1, y1, qrcode.sizes[1], qrcode.sizes[0])))
+                    qrcode.bgrToGray().copyTo(img.getRegion(new Rect(x1, y1, qrcode.sizes[1], qrcode.sizes[0])));
 
+                    if (staple) {
+                        let scaled=img.rescale(0.9,0.9);
+                        img.drawFillPoly([[new cv.Point2(0,0), new cv.Point2(img.sizes[1]-1,0), new cv.Point2(img.sizes[1]-1,img.sizes[0]-1), new cv.Point2(0,img.sizes[0]-1), new cv.Point2(0,0)]],new cv.Vec3(255, 255, 255));
+                        let tgt=new cv.Rect(Math.round(img.sizes[1]-img.sizes[1]*0.9), Math.round(img.sizes[0]-img.sizes[0]*0.9)/2, Math.round(img.sizes[1]*0.9), Math.round(img.sizes[0]*0.9));
+                        scaled.copyTo(img.getRegion(tgt));
+                    }
                     await omr.pdf.writePDF(exportpath, img);
+
                 }
 
             }
