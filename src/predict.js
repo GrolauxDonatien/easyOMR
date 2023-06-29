@@ -120,7 +120,7 @@ async function run(directory) {
         excel.cell('data', 9).string("ts2");
         excel.cell('data', 10).string("ts3");
         excel.pushLine('data');
-//        tsscores={}; // reset min/max
+        //        tsscores={}; // reset min/max
     }, (wb, line) => {
         wb.data.cell(line + 2, 2).string("ts1min");
         wb.data.cell(line + 2, 3).string("ts1max");
@@ -131,16 +131,45 @@ async function run(directory) {
         wb.data.cell(line + 3, 1).string("yes");
         wb.data.cell(line + 4, 1).string("no");
         wb.data.cell(line + 5, 1).string("full");
-        let keys=["yes","no","full"];
-        for(let i=0; i<keys.length; i++) {
-            let k=keys[i];
-            for(let j=0; j<3 ;j++) {
-                let [min,max]=getts(k,j);
-                wb.data.cell(line+3+i,2+j+j).number(min);
-                wb.data.cell(line+3+i,3+j+j).number(max);
-            } 
+        let keys = ["yes", "no", "full"];
+        for (let i = 0; i < keys.length; i++) {
+            let k = keys[i];
+            for (let j = 0; j < 3; j++) {
+                let [min, max] = getts(k, j);
+                wb.data.cell(line + 3 + i, 2 + j + j).number(min);
+                wb.data.cell(line + 3 + i, 3 + j + j).number(max);
+            }
         }
         console.log(JSON.stringify(tsscores));
+
+        function pretty(v, up) {
+            if (v < 0) up = !up;
+            if (up) {
+                return Math.round(v * 1.01 / 1000) * 1000;
+            } else {
+                return Math.round(v * 0.99 / 1000) * 1000;
+            }
+        }
+
+        function process(what) {
+            let i = 0;
+            let out = [];
+            out.push("let " + what + " = (");
+            while ((what + i) in tsscores) {
+                if (i > 0) out.push(" && ");
+                let [min, max] = tsscores[what + i];
+                out.push("v" + (i + 1) + " > " + pretty(min, false));
+                out.push(" && ");
+                out.push("v" + (i + 1) + " < " + pretty(min, true));
+                i++;
+            }
+            out.push(");");
+            return out.join('');
+        }
+
+        console.log(process("full"));
+        console.log(process("yes"));
+        console.log(process("no"));
     });
 
     function score(r) {

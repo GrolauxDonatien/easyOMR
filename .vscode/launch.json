@@ -37,7 +37,7 @@
             "program": "${workspaceFolder}\\test.js"
         },
         {
-            "name": "Export train data",
+            "name": "Run companion script",
             "description":"Some scripts require librairies of easyOMR, running them through electron ensures compatibility",
             "type": "node",
             "request": "launch",
@@ -49,7 +49,7 @@
             "args": [
                 ".",
                 "predict",
-                "D:\\workspace-git\\easyOMR-Tensorflow\\tensorflow\\train\\test_images"
+                "D:\\workspace-git\\easyOMR-Tensorflow\\tensorflow\\train\\train_images"
             ],
             "args predict": [
                 ".",
