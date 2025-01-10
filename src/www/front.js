@@ -9,8 +9,6 @@
 *
 */
 
-const { cpSync } = require("original-fs");
-
 api("set-menu", menuStrings);
 
 function joinPath(path, extra) {
@@ -28,7 +26,7 @@ function formatFilename(fn) {
 }
 
 function equalsFilename(fn1, fn2) {
-    return formatFilename(fn1) == formatFilename(fn2);
+    return fn2!=null && formatFilename(fn1) == formatFilename(fn2);
 }
 
 const project = (() => {
@@ -799,13 +797,13 @@ const project = (() => {
                 let n = coordsIndex(x, y, tpl.questions[i]);
                 if (n != -1) {
                     let f = null;
-                    if ("read" in info) {
+/*                    if ("read" in info) {
                         if (info.read[i] && info.read[i][n]) {
                             showInfo(info.read[i][n]);
                         } else {
                             showInfo('');
                         }
-                    }
+                    }*/
                     if (info.failed[i] && info.failed[i][n]) {
                         f = info.failed[i][n];
                         info.failed[i][n] = null; // remove fail marker
@@ -1250,8 +1248,27 @@ const project = (() => {
         function linkQRCodes(current) {
             if (current.template[0].type != "customqr") return;
             let links = {};
+            let lastnoma=null;
             for (let i = 0; i < current.scans.length; i++) {
+                let pagescount=i%current.template.length;
                 let s = current.scans[i];
+                if (s.qr && s.qr.code==-1) { // auto fix
+                    if (pagescount==0) {
+                        lastnoma=s.noma;
+                        s.qr.code=lastnoma;
+                    } else {
+                        s.qr.code=lastnoma;
+                        s.qr.template=pagescount;
+                        let path = joinPath(joinPath(current.path, "scans"), s.filename);
+                        api('file-scan-fixed', { path, template: current.template[pagescount], strings: fileScanStrings, corners: s.corners }, (result) => {
+                            delete s.error; // reset eventual error
+                            for (let k in result) {
+                                s[k] = result[k];
+                            }
+                            save(); // unfortunately, this is required for updating the whole list
+                        });
+                    }
+                }
                 if (s.qr && s.qr.template == 0) {
                     links[s.qr.code] = s.noma;
                 }

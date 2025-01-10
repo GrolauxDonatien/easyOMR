@@ -20,6 +20,8 @@ const HI_OPENCVTHRESHOLD_LOWMAYBE = 0.20;
 const HI_OPENCVTHRESHOLD_YES = 0.70;
 const HI_OPENCVTHRESHOLD_HIGHMAYBE = 0.97;
 
+const TEMPLATEQRCODE = "lkhglqksdlfd9876098HMLKJSDFH-1";
+
 let omrmodel;
 
 let asyncomrmodel = new Promise(async (resolve, reject) => {
@@ -365,7 +367,7 @@ const templater = (() => {
                     } else {
                         return "customqr*";
                     }
-                } else {
+                } else { // qr.data="lkhglqksdlfd9876098HMLKJSDFH-1"
                     return "customqr";
                 }
             } else {
@@ -1775,6 +1777,11 @@ function getNormalizedImage({ path, image, template, corners, strings }) {
                             return {
                                 code: o[0],
                                 template: n
+                            }
+                        } else { // unrecognized QR Code, might be user error (true story) where user forgot to print unique copies
+                            return {
+                                code: -1,
+                                template: 0
                             }
                         }
                     }
