@@ -667,7 +667,7 @@ const project = (() => {
                 return;
             }
             if (tpl.type != "customqr*") {
-                for (let i = 0; i < info.noma.length; i++) {
+                if (info.noma) for (let i = 0; i < info.noma.length; i++) {
                     let p = tpl.noma[i][0];
                     let c = info.noma.charAt(i);
                     if (c == "_" || c == "X") continue;
@@ -1096,6 +1096,7 @@ const project = (() => {
                         if (r[i] < "0" || r[i] > "9") r[i] = "X";
                     }
                     info.noma = r;
+                    if ("qr" in info) info.qr.code=r;
                     save();
                 }
             });
