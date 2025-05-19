@@ -26,7 +26,7 @@ function formatFilename(fn) {
 }
 
 function equalsFilename(fn1, fn2) {
-    return fn2!=null && formatFilename(fn1) == formatFilename(fn2);
+    return fn2 != null && formatFilename(fn1) == formatFilename(fn2);
 }
 
 const project = (() => {
@@ -453,7 +453,7 @@ const project = (() => {
 
             window.addEventListener("resize", resize);
 
-            rebind(document.querySelector("#edit-custom-template .group"), "click", () => {
+            function regroup() {
                 let newgroup = [];
                 for (let i = questions.length - 1; i >= 0; i--) {
                     for (let j = questions[i].length - 1; j >= 0; j--) {
@@ -482,7 +482,16 @@ const project = (() => {
                 });
                 selected = {};
                 redraw();
-            })
+            }
+
+            rebind(document.querySelector("#edit-custom-template .group"), "click", regroup);
+
+            nav.onKeypress("edit-custom-template", (e) => {
+                switch (e.key) {
+                    case "g":
+                        regroup();
+                }
+            });
 
             rebind(document.querySelector("#edit-custom-template .delete"), "click", () => {
                 let newgroup = [];
@@ -637,7 +646,7 @@ const project = (() => {
                     if (current.template[i].thisgroup == info.group) count += current.template[i].questions.length;
                 }
             }
-            api("file-image", { path: joinPath(path, info.filename), corners: (info.error==fileScanStrings.cornersError)?null:info.corners }, (result) => {
+            api("file-image", { path: joinPath(path, info.filename), corners: (info.error == fileScanStrings.cornersError) ? null : info.corners }, (result) => {
                 if (result.path != joinPath(path, info.filename)) return;
                 let image = new Image();
                 image.onload = () => {
@@ -797,13 +806,13 @@ const project = (() => {
                 let n = coordsIndex(x, y, tpl.questions[i]);
                 if (n != -1) {
                     let f = null;
-/*                    if ("read" in info) {
-                        if (info.read[i] && info.read[i][n]) {
-                            showInfo(info.read[i][n]);
-                        } else {
-                            showInfo('');
-                        }
-                    }*/
+                    /*                    if ("read" in info) {
+                                            if (info.read[i] && info.read[i][n]) {
+                                                showInfo(info.read[i][n]);
+                                            } else {
+                                                showInfo('');
+                                            }
+                                        }*/
                     if (info.failed[i] && info.failed[i][n]) {
                         f = info.failed[i][n];
                         info.failed[i][n] = null; // remove fail marker
@@ -1096,7 +1105,7 @@ const project = (() => {
                         if (r[i] < "0" || r[i] > "9") r[i] = "X";
                     }
                     info.noma = r;
-                    if ("qr" in info) info.qr.code=r;
+                    if ("qr" in info) info.qr.code = r;
                     save();
                 }
             });
@@ -1249,17 +1258,17 @@ const project = (() => {
         function linkQRCodes(current) {
             if (current.template[0].type != "customqr") return;
             let links = {};
-            let lastnoma=null;
+            let lastnoma = null;
             for (let i = 0; i < current.scans.length; i++) {
-                let pagescount=i%current.template.length;
+                let pagescount = i % current.template.length;
                 let s = current.scans[i];
-                if (s.qr && s.qr.code==-1) { // auto fix
-                    if (pagescount==0) {
-                        lastnoma=s.noma;
-                        s.qr.code=lastnoma;
+                if (s.qr && s.qr.code == -1) { // auto fix
+                    if (pagescount == 0) {
+                        lastnoma = s.noma;
+                        s.qr.code = lastnoma;
                     } else {
-                        s.qr.code=lastnoma;
-                        s.qr.template=pagescount;
+                        s.qr.code = lastnoma;
+                        s.qr.template = pagescount;
                         let path = joinPath(joinPath(current.path, "scans"), s.filename);
                         api('file-scan-fixed', { path, template: current.template[pagescount], strings: fileScanStrings, corners: s.corners }, (result) => {
                             delete s.error; // reset eventual error
@@ -2197,11 +2206,11 @@ document.getElementById("template-create-copies").addEventListener('click', () =
     let diag = dialog({
         title: customTemplateStrings.createCopiesTitle,
         content: customTemplateStrings.createCopies,
-        html: '<input type="number" id="number_of_copies" min="1" max="9999" value="1"><br><input type="checkbox" id="staples" style="margin-left:38px">'+customTemplateStrings.staples,
+        html: '<input type="number" id="number_of_copies" min="1" max="9999" value="1"><br><input type="checkbox" id="staples" style="margin-left:38px">' + customTemplateStrings.staples,
         buttons: {
             [strings.continue]: function () {
                 let v = parseInt(diag.content.querySelector('input[type=number]').value);
-                let staple=diag.content.querySelector('input[type=checkbox]').checked;
+                let staple = diag.content.querySelector('input[type=checkbox]').checked;
                 if (!isNaN(v) && v > 0) {
                     project.createCopies(v, staple);
                 }
