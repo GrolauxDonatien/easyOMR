@@ -110,7 +110,7 @@ let actions = {
                         }
                     } else if (isXlsx(files[i].name)) {
                         let stat = fs.statSync(fspath.join(path, files[i].name));
-                        prep.push(files[i].name + ":" + stat.size + ":" + stat.mtimeMs);
+                        prep.push(files[i].name + ":" + stat.size + ":" + stat.mtimeMs.split('.')[0]);
                     }
                 }
                 cb(prep);

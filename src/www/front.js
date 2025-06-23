@@ -29,6 +29,14 @@ function equalsFilename(fn1, fn2) {
     return fn2 != null && formatFilename(fn1) == formatFilename(fn2);
 }
 
+function fixOldTimestamp(fn) {
+    // a change in fs.stat removed the trailing . for mtime, which triggers false invalidation of templates and/or scans
+    let idx1 = fn.indexOf("@");
+    let idx2 = fn.lastIndexOf(".");
+    if (idx1 != -1 && idx2 != -1 && idx2 > idx1) return fn.substring(0, idx2);
+    return fn;
+}
+
 const project = (() => {
     let current = {};
     let forceRefresh;
@@ -41,7 +49,10 @@ const project = (() => {
         let listEl = document.querySelector('#templateView .leftview');
         function list(full = false) {
             let l = [];
-            for (let i = 0; i < current.template.length; i++) l.push(full ? current.template[i].filename : formatFilename(current.template[i].filename));
+            for (let i = 0; i < current.template.length; i++) {
+                let fn = full ? current.template[i].filename : formatFilename(current.template[i].filename);
+                l.push(fn);
+            }
             return l;
         }
         v.setList(list());
@@ -1105,7 +1116,7 @@ const project = (() => {
                         if (r[i] < "0" || r[i] > "9") r[i] = "X";
                     }
                     info.noma = r;
-                    if ("qr" in info) info.qr.code = r;
+                    if (info.qr && info.qr.code) info.qr.code = r;
                     save();
                 }
             });
@@ -1530,6 +1541,23 @@ const project = (() => {
                 }
                 if (!("scans" in current)) {
                     current.scans = [];
+                }
+                if (current.template.length > 0) {
+                    if (fixOldTimestamp(current.template[0].filename) != current.template[0].filename) {
+                        for (let i = 0; i < current.template.length; i++) {
+                            current.template[i].filename = fixOldTimestamp(current.template[i].filename);
+                        }
+                    }
+                }
+                if (current.scans.length > 0) {
+                    for (let i = 0; i < current.scans.length; i++) {
+                        current.scans[i].template = fixOldTimestamp(current.scans[i].template);
+                    }
+                    if (fixOldTimestamp(current.scans[0].filename) != current.scans[0].filename) {
+                        for (let i = 0; i < current.scans.length; i++) {
+                            current.scans[i].filename = fixOldTimestamp(current.scans[i].filename);
+                        }
+                    }
                 }
                 if (("template" in current) && current.template.length > 0) {
                     if (("scans" in current) && current.scans.length > 0 && !hasErrors()) {

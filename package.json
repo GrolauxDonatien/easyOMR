@@ -1,6 +1,6 @@
 {
     "name": "easyomr",
-    "version": "1.0.64",
+    "version": "1.0.66",
     "description": "easyOMR!",
     "main": "src/main.js",
     "author": "Donatien Grolaux",
